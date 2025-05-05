@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "606674396188",
+    "project_id": "womangigworker",
+    "storage_bucket": "womangigworker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:606674396188:android:ace7d937b1ea9fe7c6ebd9",
+        "android_client_info": {
+          "package_name": "com.example.womangigworker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBq3AWiLlYEWpFoYxSRFLQ5RetuY0TAq4Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
