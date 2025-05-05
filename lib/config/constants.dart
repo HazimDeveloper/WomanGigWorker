@@ -21,6 +21,7 @@ class AppConstants {
   
   // User roles
   static const String roleCustomer = 'customer';
+  static const String roleWorker = 'worker'; // Added worker role
   static const String roleBuddy = 'buddy';
   static const String roleAdmin = 'admin';
   
@@ -28,6 +29,11 @@ class AppConstants {
   static const String safeLevelSafe = 'safe';
   static const String safeLevelModerate = 'moderate';
   static const String safeLevelHighRisk = 'high_risk';
+  
+  // Feedback status
+  static const String feedbackStatusPending = 'pending'; // New feedback status
+  static const String feedbackStatusApproved = 'approved'; // New feedback status
+  static const String feedbackStatusRejected = 'rejected'; // New feedback status
 }
 
 class AppAssets {

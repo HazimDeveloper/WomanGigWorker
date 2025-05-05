@@ -19,7 +19,6 @@ class AdminApprovalScreen extends StatefulWidget {
 
 class _AdminApprovalScreenState extends State<AdminApprovalScreen> {
   bool _isLoading = false;
-  List<FeedbackModel> _pendingFeedback = [];
 
   @override
   void initState() {
@@ -27,63 +26,21 @@ class _AdminApprovalScreenState extends State<AdminApprovalScreen> {
     _loadPendingFeedback();
   }
 
- Future<void> _loadPendingFeedback() async {
-  setState(() {
-    _isLoading = true;
-  });
-
-  try {
-    // Remove the await since loadFeedback() is void and not an async method
-    Provider.of<LocationProvider>(context, listen: false).loadFeedback();
-    
-    // Add a small delay to allow data to load
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    // Now get the feedback data
-    final allFeedback = Provider.of<LocationProvider>(context, listen: false).feedback;
-    
+  Future<void> _loadPendingFeedback() async {
     setState(() {
-      _pendingFeedback = allFeedback;
+      _isLoading = true;
     });
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error loading pending feedback: ${e.toString()}'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  } finally {
-    setState(() {
-      _isLoading = false;
-    });
-  }
-}
 
-  Future<void> _approveFeedback(FeedbackModel feedback) async {
-    // In a real app, you would update the feedback status in the database
     try {
-      // Simulate API call
-      setState(() {
-        _isLoading = true;
-      });
+      // Load pending feedback
+      Provider.of<LocationProvider>(context, listen: false).loadPendingFeedback();
       
+      // Add a small delay to allow data to load
       await Future.delayed(const Duration(milliseconds: 500));
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Feedback approved successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-      // Remove from pending list
-      setState(() {
-        _pendingFeedback.removeWhere((item) => item.id == feedback.id);
-      });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error approving feedback: ${e.toString()}'),
+          content: Text('Error loading pending feedback: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -94,27 +51,74 @@ class _AdminApprovalScreenState extends State<AdminApprovalScreen> {
     }
   }
 
-  Future<void> _rejectFeedback(FeedbackModel feedback) async {
-    // In a real app, you would mark the feedback as rejected or delete it
+  Future<void> _approveFeedback(FeedbackModel feedback) async {
     try {
-      // Simulate API call
+      // Set loading state
       setState(() {
         _isLoading = true;
       });
       
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Approve feedback
+      final success = await Provider.of<LocationProvider>(context, listen: false)
+          .approveFeedback(feedback.id);
       
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Feedback approved successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to approve feedback'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Feedback rejected'),
-          backgroundColor: Colors.orange,
+        SnackBar(
+          content: Text('Error approving feedback: ${e.toString()}'),
+          backgroundColor: Colors.red,
         ),
       );
-      
-      // Remove from pending list
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _rejectFeedback(FeedbackModel feedback) async {
+    try {
+      // Set loading state
       setState(() {
-        _pendingFeedback.removeWhere((item) => item.id == feedback.id);
+        _isLoading = true;
       });
+      
+      // Reject feedback
+      final success = await Provider.of<LocationProvider>(context, listen: false)
+          .rejectFeedback(feedback.id);
+      
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Feedback rejected'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to reject feedback'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -123,9 +127,11 @@ class _AdminApprovalScreenState extends State<AdminApprovalScreen> {
         ),
       );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -153,7 +159,7 @@ class _AdminApprovalScreenState extends State<AdminApprovalScreen> {
         backgroundColor: AppColors.primary,
         elevation: 0,
         title: const Text(
-          'APPROVAL',
+          'BUDDY FEEDBACK APPROVAL',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -169,62 +175,101 @@ class _AdminApprovalScreenState extends State<AdminApprovalScreen> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             color: AppColors.primary.withOpacity(0.7),
-            child: Row(
+            child: const Row(
               children: [
                 Expanded(
                   flex: 2,
                   child: Text(
-                    'USERNAME',
+                    'BUDDY',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: Colors.black.withOpacity(0.8),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  flex: 1,
-                  child: Center(
-                    child: Text(
-                      'POSTS',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.black.withOpacity(0.8),
-                      ),
+                      color: Colors.black87,
                     ),
                   ),
                 ),
                 Expanded(
                   flex: 2,
-                  child: Center(
-                    child: Text(
-                      'STATUS',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.black.withOpacity(0.8),
-                      ),
+                  child: Text(
+                    'LOCATION',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.black87,
                     ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    'ACTIONS',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.black87,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
               ],
             ),
           ),
           
-          // Feedback List
+          // Pending Feedback List
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _pendingFeedback.isEmpty
-                    ? const Center(child: Text('No pending feedback to approve'))
-                    : ListView.builder(
-                        itemCount: _pendingFeedback.length,
-                        itemBuilder: (context, index) {
-                          final feedback = _pendingFeedback[index];
-                          return _buildFeedbackItem(feedback);
-                        },
-                      ),
+            child: Consumer<LocationProvider>(
+              builder: (context, locationProvider, _) {
+                final pendingFeedback = locationProvider.pendingFeedback;
+                
+                if (_isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                
+                if (pendingFeedback.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.check_circle_outline,
+                          size: 64,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No pending feedback to approve',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: _loadPendingFeedback,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Refresh'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.secondary,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                
+                return RefreshIndicator(
+                  onRefresh: _loadPendingFeedback,
+                  child: ListView.builder(
+                    itemCount: pendingFeedback.length,
+                    itemBuilder: (context, index) {
+                      final feedback = pendingFeedback[index];
+                      return _buildFeedbackItem(feedback);
+                    },
+                  ),
+                );
+              },
+            ),
           ),
           
           // Logout Button
@@ -250,53 +295,121 @@ class _AdminApprovalScreenState extends State<AdminApprovalScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         children: [
           // Username
           Expanded(
             flex: 2,
-            child: Text(
-              feedback.username.toUpperCase(),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 14,
-              ),
-            ),
-          ),
-          
-          // View Button
-          Expanded(
-            flex: 1,
-            child: Center(
-              child: IconButton(
-                icon: const Icon(Icons.visibility, color: Colors.black),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AdminFeedbackDetailScreen(feedback: feedback),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  feedback.username,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.person,
+                      size: 12,
+                      color: Colors.grey,
                     ),
-                  );
-                },
-              ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Buddy',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           
-          // Approval Buttons
+          // Location
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  feedback.locationName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.star,
+                      size: 12,
+                      color: Colors.amber,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      feedback.safetyRating.toStringAsFixed(1),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // Actions
           Expanded(
             flex: 2,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // View Button
+                IconButton(
+                  icon: const Icon(
+                    Icons.visibility,
+                    color: Colors.blue,
+                    size: 24,
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AdminFeedbackDetailScreen(feedback: feedback),
+                      ),
+                    );
+                  },
+                  tooltip: 'View Details',
+                ),
+                
                 // Approve Button
                 IconButton(
                   icon: const Icon(
                     Icons.check_circle,
                     color: Colors.green,
-                    size: 28,
+                    size: 24,
                   ),
                   onPressed: () => _approveFeedback(feedback),
+                  tooltip: 'Approve',
                 ),
                 
                 // Reject Button
@@ -304,9 +417,10 @@ class _AdminApprovalScreenState extends State<AdminApprovalScreen> {
                   icon: const Icon(
                     Icons.cancel,
                     color: Colors.red,
-                    size: 28,
+                    size: 24,
                   ),
                   onPressed: () => _rejectFeedback(feedback),
+                  tooltip: 'Reject',
                 ),
               ],
             ),

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:trust_me/screens/common/login_screen.dart';
@@ -21,6 +23,7 @@ class BuddyHomeScreen extends StatefulWidget {
 class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
   int _currentIndex = 0;
   final PageController _pageController = PageController();
+  bool _showApprovedFeedback = true; // Toggle between approved and pending
 
   @override
   void initState() {
@@ -29,7 +32,18 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
     PaintingBinding.instance.imageCache.maximumSize = 200;
     PaintingBinding.instance.imageCache.maximumSizeBytes = 100 << 20; // 100 MB
     
-    // Initial data load happens in the _HomeFeedPage now
+    // Initial data load
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+        // Clear existing data first
+        locationProvider.clearData();
+        // Load both approved and pending feedback
+        locationProvider.loadFeedback();
+        locationProvider.loadPendingFeedback();
+        locationProvider.loadLocations();
+      }
+    });
   }
 
   @override
@@ -48,101 +62,8 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
     _pageController.jumpToPage(index);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final user = Provider.of<AuthProvider>(context).user;
-    if (user == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.pushReplacementNamed(context, LoginScreen.routeName);
-      });
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-    
-    return Scaffold(
-      backgroundColor: AppColors.primary,
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: _onPageChanged,
-        children: [
-          // Home Feed Page - wrapped in KeepAlivePage to prevent rebuilds
-          KeepAlivePage(child: _BuddyHomeFeedPage(userId: user.id)),
-          
-          // Map Page
-          const KeepAlivePage(child: BuddyMapScreen()),
-          
-          // Profile Page
-          const KeepAlivePage(child: BuddyProfileScreen()),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: AppColors.secondary,
-        unselectedItemColor: Colors.grey,
-        showSelectedLabels: false,
-        showUnselectedLabels: false,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Map',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// KeepAlivePage wrapper to prevent PageView from rebuilding pages
-class KeepAlivePage extends StatefulWidget {
-  final Widget child;
-  
-  const KeepAlivePage({Key? key, required this.child}) : super(key: key);
-  
-  @override
-  _KeepAlivePageState createState() => _KeepAlivePageState();
-}
-
-class _KeepAlivePageState extends State<KeepAlivePage> with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-  
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    return widget.child;
-  }
-}
-
-// Dedicated widget for the home feed to better control rebuilds
-class _BuddyHomeFeedPage extends StatefulWidget {
-  final String userId;
-  
-  const _BuddyHomeFeedPage({Key? key, required this.userId}) : super(key: key);
-  
-  @override
-  _BuddyHomeFeedPageState createState() => _BuddyHomeFeedPageState();
-}
-
-class _BuddyHomeFeedPageState extends State<_BuddyHomeFeedPage> {
-  @override
-  void initState() {
-    super.initState();
-    // Load feedback data when this page initializes
-    Provider.of<LocationProvider>(context, listen: false).loadFeedback();
-  }
-
   Future<void> _handleLikeToggle(FeedbackModel feedback, bool isLiked) async {
-    final userId = widget.userId;
+    final userId = Provider.of<AuthProvider>(context, listen: false).user!.id;
     await Provider.of<LocationProvider>(context, listen: false).toggleLike(
       feedbackId: feedback.id,
       userId: userId,
@@ -191,6 +112,59 @@ class _BuddyHomeFeedPageState extends State<_BuddyHomeFeedPage> {
   
   @override
   Widget build(BuildContext context) {
+    final user = Provider.of<AuthProvider>(context).user;
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, LoginScreen.routeName);
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    
+    return Scaffold(
+      backgroundColor: AppColors.primary,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: _onPageChanged,
+        children: [
+          // Home Feed Page - wrapped in KeepAlivePage to prevent rebuilds
+          _buildBuddyHomeFeed(),
+          
+          // Map Page
+          const KeepAlivePage(child: BuddyMapScreen()),
+          
+          // Profile Page
+          const KeepAlivePage(child: BuddyProfileScreen()),
+        ],
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        selectedItemColor: AppColors.secondary,
+        unselectedItemColor: Colors.grey,
+        showSelectedLabels: false,
+        showUnselectedLabels: false,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: 'Map',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build buddy home feed
+  Widget _buildBuddyHomeFeed() {
     return SafeArea(
       child: Column(
         children: [
@@ -207,11 +181,23 @@ class _BuddyHomeFeedPageState extends State<_BuddyHomeFeedPage> {
                   ),
                 ),
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.notifications_none),
+                // Toggle button
+                TextButton.icon(
                   onPressed: () {
-                    // Notification functionality
+                    setState(() {
+                      _showApprovedFeedback = !_showApprovedFeedback;
+                    });
                   },
+                  icon: Icon(
+                    _showApprovedFeedback ? Icons.visibility : Icons.hourglass_top,
+                    color: _showApprovedFeedback ? Colors.green : Colors.orange,
+                  ),
+                  label: Text(
+                    _showApprovedFeedback ? 'Approved' : 'My Pending',
+                    style: TextStyle(
+                      color: _showApprovedFeedback ? Colors.green : Colors.orange,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -235,7 +221,7 @@ class _BuddyHomeFeedPageState extends State<_BuddyHomeFeedPage> {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'You are a Buddy user. You can view and comment on locations but cannot add new feedback.',
+                    'You are a Buddy user. Your feedback will need admin approval before showing to others.',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.black87,
@@ -246,78 +232,337 @@ class _BuddyHomeFeedPageState extends State<_BuddyHomeFeedPage> {
             ),
           ),
           
-          // Feedback List with optimized rebuild strategy
+          // Feedback List
           Expanded(
-            child: Selector<LocationProvider, _FeedbackListState>(
-              // Only select the specific data we need
-              selector: (_, provider) => _FeedbackListState(
-                feedback: provider.feedback,
-                isLoading: provider.isLoading,
-                errorMessage: provider.errorMessage,
+            child: _showApprovedFeedback
+                ? _buildApprovedFeedbackList()
+                : _buildMyPendingFeedbackList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Show approved feedback from everyone
+  Widget _buildApprovedFeedbackList() {
+    return RefreshIndicator(
+      onRefresh: () async {
+         Provider.of<LocationProvider>(context, listen: false).loadFeedback();
+      },
+      child: Consumer<LocationProvider>(
+        builder: (context, locationProvider, _) {
+          final feedback = locationProvider.feedback;
+          final isLoading = locationProvider.isLoading;
+          
+          if (isLoading && feedback.isEmpty) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
+          if (feedback.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.feedback_outlined,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No approved feedback available yet',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: () => setState(() {
+                      _showApprovedFeedback = false;
+                    }),
+                    icon: const Icon(Icons.hourglass_top),
+                    label: const Text('View my pending feedback'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
               ),
-              // Only rebuild if the specific state we care about changed
-              shouldRebuild: (previous, next) => 
-                previous.isLoading != next.isLoading ||
-                previous.errorMessage != next.errorMessage ||
-                previous.feedback.length != next.feedback.length,
-              builder: (context, state, _) {
-                if (state.isLoading && state.feedback.isEmpty) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
-                
-                if (state.feedback.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No feedback available yet',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.black54,
+            );
+          }
+          
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: feedback.length,
+            itemBuilder: (context, index) {
+              final userId = Provider.of<AuthProvider>(context).user!.id;
+              return FeedbackCard(
+                key: ValueKey(feedback[index].id),
+                feedback: feedback[index],
+                currentUserId: userId,
+                onTap: () {
+                  // View feedback details
+                },
+                onLikeToggle: (isLiked) {
+                  _handleLikeToggle(feedback[index], isLiked);
+                },
+                onAddComment: () {
+                  _showCommentDialog(feedback[index]);
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // Show only this buddy's pending feedback
+  Widget _buildMyPendingFeedbackList() {
+    final userId = Provider.of<AuthProvider>(context).user!.id;
+    
+    return RefreshIndicator(
+      onRefresh: () async {
+         Provider.of<LocationProvider>(context, listen: false).loadPendingFeedback();
+      },
+      child: Consumer<LocationProvider>(
+        builder: (context, locationProvider, _) {
+          final allPendingFeedback = locationProvider.pendingFeedback;
+          // Filter to only show this buddy's pending feedback
+          final myPendingFeedback = allPendingFeedback
+              .where((feedback) => feedback.userId == userId)
+              .toList();
+          
+          final isLoading = locationProvider.isLoading;
+          
+          if (isLoading && myPendingFeedback.isEmpty) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
+          if (myPendingFeedback.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.check_circle_outline,
+                    size: 64,
+                    color: Colors.green,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'You have no pending feedback',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'All your feedback has been processed',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => setState(() {
+                      _showApprovedFeedback = true;
+                    }),
+                    icon: const Icon(Icons.visibility),
+                    label: const Text('View approved feedback'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: myPendingFeedback.length,
+            itemBuilder: (context, index) {
+              final feedback = myPendingFeedback[index];
+              return _buildPendingFeedbackCard(feedback);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  // Custom card for pending feedback
+  Widget _buildPendingFeedbackCard(FeedbackModel feedback) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: Colors.orange.withOpacity(0.5),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Pending status banner
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.2),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(10),
+                topRight: Radius.circular(10),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.hourglass_top,
+                  color: Colors.orange,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Waiting for Admin Approval',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'Submitted: ${_formatDate(feedback.createdAt)}',
+                  style: TextStyle(
+                    color: Colors.grey[600],
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Location header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on, color: Colors.grey),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    feedback.locationName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                // Safety rating
+                Row(
+                  children: [
+                    const Icon(Icons.star, color: Colors.amber, size: 18),
+                    const SizedBox(width: 4),
+                    Text(
+                      feedback.safetyRating.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
                       ),
                     ),
-                  );
-                }
-                
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: state.feedback.length,
-                  itemBuilder: (context, index) {
-                    final feedback = state.feedback[index];
-                    return FeedbackCard(
-                      key: ValueKey(feedback.id), // Important for efficient rebuilds
-                      feedback: feedback,
-                      currentUserId: widget.userId,
-                      onTap: () {
-                        // View feedback details
-                      },
-                      onLikeToggle: (isLiked) {
-                        _handleLikeToggle(feedback, isLiked);
-                      },
-                      onAddComment: () {
-                        _showCommentDialog(feedback);
-                      },
-                    );
-                  },
-                );
-              },
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
+          // Feedback content
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(
+              feedback.feedback,
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+          
+          // Image if available
+          if (feedback.imageBase64 != null && feedback.imageBase64!.isNotEmpty)
+            Container(
+              width: double.infinity,
+              height: 150,
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                image: DecorationImage(
+                  image: MemoryImage(base64Decode(feedback.imageBase64!)),
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+          
+          // Footer
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'Admin will review this feedback soon. Approved feedback will be visible to everyone.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ),
         ],
       ),
     );
   }
+
+  // Format date for display
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
+  }
 }
 
-// State class for the feedback list to optimize rebuilds
-class _FeedbackListState {
-  final List<FeedbackModel> feedback;
-  final bool isLoading;
-  final String? errorMessage;
+// KeepAlivePage wrapper to prevent PageView from rebuilding pages
+class KeepAlivePage extends StatefulWidget {
+  final Widget child;
   
-  const _FeedbackListState({
-    required this.feedback,
-    required this.isLoading,
-    this.errorMessage,
-  });
+  const KeepAlivePage({Key? key, required this.child}) : super(key: key);
+  
+  @override
+  _KeepAlivePageState createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<KeepAlivePage> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+  
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
 }

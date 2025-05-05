@@ -22,32 +22,27 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   int _currentIndex = 0;
   final PageController _pageController = PageController();
 
-@override
-void initState() {
-  super.initState();
-  
-  // Force data loading
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (mounted) {
-      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-      // Clear existing data first
-      locationProvider.clearData();
-      // Then reload
-      locationProvider.loadFeedback();
-      locationProvider.loadLocations();
-    }
-  });
-}
+  @override
+  void initState() {
+    super.initState();
+    
+    // Force data loading
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+        // Clear existing data first
+        locationProvider.clearData();
+        // Then reload approved feedback only
+        locationProvider.loadFeedback();
+        locationProvider.loadLocations();
+      }
+    });
+  }
 
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
-  }
-
-  void _loadData() {
-    // Load feedbacks for the home screen
-    Provider.of<LocationProvider>(context, listen: false).loadFeedback();
   }
 
   void _onPageChanged(int index) {
@@ -111,12 +106,17 @@ void initState() {
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AuthProvider>(context).user;
-     if (user == null) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.pushReplacementNamed(context, '/login');
-    });
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
-  }
+    
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, '/login');
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    
+    // Determine if user is a worker for styling
+    final bool isWorker = user.role == AppConstants.roleWorker;
+
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: PageView(
@@ -124,7 +124,7 @@ void initState() {
         onPageChanged: _onPageChanged,
         children: [
           // Home Feed Page
-          _buildHomeFeed(),
+          _buildHomeFeed(isWorker),
           
           // Map Page
           const CustomerMapScreen(),
@@ -141,7 +141,7 @@ void initState() {
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
-        selectedItemColor: AppColors.secondary,
+        selectedItemColor: isWorker ? Colors.teal : AppColors.secondary,
         unselectedItemColor: Colors.grey,
         showSelectedLabels: false,
         showUnselectedLabels: false,
@@ -167,7 +167,7 @@ void initState() {
     );
   }
 
-  Widget _buildHomeFeed() {
+  Widget _buildHomeFeed(bool isWorker) {
     return SafeArea(
       child: Column(
         children: [
@@ -194,56 +194,138 @@ void initState() {
             ),
           ),
           
-          // Feedback List
-          Expanded(
-            child: Consumer<LocationProvider>(
-              builder: (context, locationProvider, _) {
-                final feedback = locationProvider.feedback;
-                final isLoading = locationProvider.isLoading;
-                
-                if (isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
-                
-                if (feedback.isEmpty) {
-                  return const Center(
-                    child: Text(
-                      'No feedback available yet',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.black54,
-                      ),
+          // Role-specific header
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _getRoleColor(isWorker).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _getRoleColor(isWorker)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _getRoleIcon(isWorker),
+                  color: _getRoleColor(isWorker),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _getRoleMessage(isWorker),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black87,
                     ),
-                  );
-                }
-                
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: feedback.length,
-                  itemBuilder: (context, index) {
-                    final userId = Provider.of<AuthProvider>(context).user!.id;
-                    return FeedbackCard(
-                      feedback: feedback[index],
-                      currentUserId: userId,
-                      onTap: () {
-                        // TODO: Implement feedback details screen
-                      },
-                      onLikeToggle: (isLiked) {
-                        _handleLikeToggle(feedback[index], isLiked);
-                      },
-                      onAddComment: () {
-                        _showCommentDialog(feedback[index]);
-                      },
-                    );
-                  },
-                );
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Feedback List with optimized rebuild strategy
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                 Provider.of<LocationProvider>(context, listen: false).loadFeedback();
               },
+              child: Consumer<LocationProvider>(
+                builder: (context, locationProvider, _) {
+                  final feedback = locationProvider.feedback;
+                  final isLoading = locationProvider.isLoading;
+                  
+                  if (isLoading && feedback.isEmpty) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+                  
+                  if (feedback.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.feedback_outlined,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No feedback available yet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Pull down to refresh',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              _pageController.jumpToPage(2); // Go to upload screen
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add your feedback'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isWorker ? Colors.teal : AppColors.secondary,
+                              foregroundColor: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: feedback.length,
+                    itemBuilder: (context, index) {
+                      final userId = Provider.of<AuthProvider>(context).user!.id;
+                      return FeedbackCard(
+                        feedback: feedback[index],
+                        currentUserId: userId,
+                        onTap: () {
+                          // TODO: Implement feedback details screen
+                        },
+                        onLikeToggle: (isLiked) {
+                          _handleLikeToggle(feedback[index], isLiked);
+                        },
+                        onAddComment: () {
+                          _showCommentDialog(feedback[index]);
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  // Helper methods for role-specific UI
+  Color _getRoleColor(bool isWorker) {
+    return isWorker ? Colors.teal : AppColors.secondary;
+  }
+
+  IconData _getRoleIcon(bool isWorker) {
+    return isWorker ? Icons.work : Icons.person;
+  }
+
+  String _getRoleMessage(bool isWorker) {
+    if (isWorker) {
+      return 'Worker Mode: Your feedback will automatically be approved to help other women in your community.';
+    } else {
+      return 'Customer Mode: You can view and add safety information to help other women.';
+    }
   }
 }

@@ -65,13 +65,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     
     Future.delayed(const Duration(milliseconds: 500), () {
       if (authProvider.isAuthenticated) {
-        // User is authenticated, navigate to appropriate home screen
+        // User is authenticated, navigate to appropriate home screen based on role
         if (authProvider.isAdmin) {
           Navigator.of(context).pushReplacementNamed(AdminHomeScreen.routeName);
         } else if (authProvider.isBuddy) {
           Navigator.of(context).pushReplacementNamed(BuddyHomeScreen.routeName);
         } else {
-          // Default to Customer
+          // Both Worker and Customer roles use the same CustomerHomeScreen
           Navigator.of(context).pushReplacementNamed(CustomerHomeScreen.routeName);
         }
       } else {

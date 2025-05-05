@@ -9,7 +9,9 @@ import '../models/user_model.dart';
 import '../services/database_service.dart';
 import '../services/location_service.dart';
 import '../services/storage_service.dart';
+import '../config/constants.dart';
 import 'dart:convert';
+
 class LocationProvider with ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
   final LocationService _locationService = LocationService();
@@ -17,6 +19,7 @@ class LocationProvider with ChangeNotifier {
   
   List<LocationModel> _locations = [];
   List<FeedbackModel> _feedback = [];
+  List<FeedbackModel> _pendingFeedback = []; // New list for pending feedback
   LocationModel? _selectedLocation;
   Position? _currentPosition;
   bool _isLoading = false;
@@ -26,6 +29,7 @@ class LocationProvider with ChangeNotifier {
   // Getters
   List<LocationModel> get locations => _locations;
   List<FeedbackModel> get feedback => _feedback;
+  List<FeedbackModel> get pendingFeedback => _pendingFeedback;
   LocationModel? get selectedLocation => _selectedLocation;
   Position? get currentPosition => _currentPosition;
   bool get isLoading => _isLoading;
@@ -34,6 +38,7 @@ class LocationProvider with ChangeNotifier {
 
   StreamSubscription<List<LocationModel>>? _locationsSubscription;
   StreamSubscription<List<FeedbackModel>>? _feedbackSubscription;
+  StreamSubscription<List<FeedbackModel>>? _pendingFeedbackSubscription;
 
   // Constructor
   LocationProvider() {
@@ -43,89 +48,90 @@ class LocationProvider with ChangeNotifier {
         print("Auto-initializing LocationProvider");
         loadLocations();
         loadFeedback();
+        loadPendingFeedback(); // Load pending feedback
         getCurrentLocation();
         _initialized = true;
       }
     });
   }
 
-// Get feedback for a specific location
-List<FeedbackModel> getFeedbackForLocation(String locationId) {
-  return _feedback.where((feedback) => 
-      feedback.locationId == locationId).toList();
-}
+  // Get feedback for a specific location
+  List<FeedbackModel> getFeedbackForLocation(String locationId) {
+    return _feedback.where((feedback) => 
+        feedback.locationId == locationId).toList();
+  }
 
-// Check if a location has feedback
-bool hasLocationFeedback(String locationId) {
-  return _feedback.any((feedback) => feedback.locationId == locationId);
-}
+  // Check if a location has feedback
+  bool hasLocationFeedback(String locationId) {
+    return _feedback.any((feedback) => feedback.locationId == locationId);
+  }
 
- void loadLocations() {
-  _setLoading(true);
-  try {
-    print("Starting to load locations data...");
-    
-    // Cancel existing subscription if any
-    _locationsSubscription?.cancel();
-    
-    // Create new subscription
-    _locationsSubscription = _databaseService.getLocations().listen((locationsList) {
-      print("Received ${locationsList.length} locations from database");
+  void loadLocations() {
+    _setLoading(true);
+    try {
+      print("Starting to load locations data...");
       
-      // Log all locations for debugging
-      for (var location in locationsList) {
-        print("Location: ${location.name}, ID: ${location.id}");
-        print("  Coordinates: ${location.latitude}, ${location.longitude}");
-        print("  Safety: ${location.safetyLevel}, Rating: ${location.averageSafetyRating}");
-      }
+      // Cancel existing subscription if any
+      _locationsSubscription?.cancel();
       
-      _locations = locationsList;
-      _setLoading(false);
-      notifyListeners();
-      
-      // If no locations, add a sample one in Jitra
-      if (locationsList.isEmpty) {
-        print("No locations found, adding a sample location");
-        _addSampleLocation();
-      }
-    }, onError: (e) {
-      print("Error in locations listener: $e");
+      // Create new subscription
+      _locationsSubscription = _databaseService.getLocations().listen((locationsList) {
+        print("Received ${locationsList.length} locations from database");
+        
+        // Log all locations for debugging
+        for (var location in locationsList) {
+          print("Location: ${location.name}, ID: ${location.id}");
+          print("  Coordinates: ${location.latitude}, ${location.longitude}");
+          print("  Safety: ${location.safetyLevel}, Rating: ${location.averageSafetyRating}");
+        }
+        
+        _locations = locationsList;
+        _setLoading(false);
+        notifyListeners();
+        
+        // If no locations, add a sample one in Jitra
+        if (locationsList.isEmpty) {
+          print("No locations found, adding a sample location");
+          _addSampleLocation();
+        }
+      }, onError: (e) {
+        print("Error in locations listener: $e");
+        _setError(e.toString());
+        _setLoading(false);
+      });
+    } catch (e) {
+      print("Error in loadLocations: $e");
       _setError(e.toString());
       _setLoading(false);
-    });
-  } catch (e) {
-    print("Error in loadLocations: $e");
-    _setError(e.toString());
-    _setLoading(false);
+    }
   }
-}
 
-Future<void> _addSampleLocation() async {
-  try {
-    await addLocation(
-      name: "Jitra Town Center",
-      latitude: 6.2641, // Jitra coordinates
-      longitude: 100.4214,
-    );
-    print("Added sample location in Jitra");
-  } catch (e) {
-    print("Error adding sample location: $e");
+  Future<void> _addSampleLocation() async {
+    try {
+      await addLocation(
+        name: "Jitra Town Center",
+        latitude: 6.2641, // Jitra coordinates
+        longitude: 100.4214,
+      );
+      print("Added sample location in Jitra");
+    } catch (e) {
+      print("Error adding sample location: $e");
+    }
   }
-}
 
-  // Load feedback
+  // Load feedback - now only loads approved feedback
   void loadFeedback() {
     _setLoading(true);
     try {
-      print("Loading feedback data...");
+      print("Loading approved feedback data...");
       
       // Cancel existing subscription if any
       _feedbackSubscription?.cancel();
       
       // Create new subscription with detailed error handling
-      _feedbackSubscription = _databaseService.getFeedback().listen(
+      _feedbackSubscription = _databaseService.getApprovedFeedback().listen(
         (feedbackList) {
-          print("Received ${feedbackList.length} feedback items from database");
+          print("Received ${feedbackList.length} approved feedback items from database");
           _feedback = feedbackList;
           _setLoading(false);
           notifyListeners();
@@ -143,15 +149,47 @@ Future<void> _addSampleLocation() async {
     }
   }
 
+  // Load pending feedback (for admin)
+  void loadPendingFeedback() {
+    _setLoading(true);
+    try {
+      print("Loading pending feedback data...");
+      
+      // Cancel existing subscription if any
+      _pendingFeedbackSubscription?.cancel();
+      
+      // Create new subscription with detailed error handling
+      _pendingFeedbackSubscription = _databaseService.getPendingFeedback().listen(
+        (feedbackList) {
+          print("Received ${feedbackList.length} pending feedback items from database");
+          _pendingFeedback = feedbackList;
+          _setLoading(false);
+          notifyListeners();
+        }, 
+        onError: (e) {
+          print("Error in pending feedback listener: $e");
+          _setError(e.toString());
+          _setLoading(false);
+        }
+      );
+    } catch (e) {
+      print("Exception in loadPendingFeedback: $e");
+      _setError(e.toString());
+      _setLoading(false);
+    }
+  }
+
   // Method to cancel all active listeners
   void cancelListeners() {
     print("Cancelling all LocationProvider listeners");
     
     _locationsSubscription?.cancel();
     _feedbackSubscription?.cancel();
+    _pendingFeedbackSubscription?.cancel();
     
     _locationsSubscription = null;
     _feedbackSubscription = null;
+    _pendingFeedbackSubscription = null;
     
     // Clear cached data to prevent stale data display
     print("Clearing cached location data");
@@ -162,6 +200,7 @@ Future<void> _addSampleLocation() async {
     print("Clearing all location data");
     _locations = [];
     _feedback = [];
+    _pendingFeedback = [];
     _selectedLocation = null;
     _currentPosition = null;
     _setLoading(false);
@@ -206,35 +245,35 @@ Future<void> _addSampleLocation() async {
     }
   }
 
-Future<List<LocationModel>> searchLocationsWithFeedback(String query) async {
-  if (query.isEmpty) return [];
-  
-  _setLoading(true);
-  try {
-    print("Searching locations with feedback for query: $query");
+  Future<List<LocationModel>> searchLocationsWithFeedback(String query) async {
+    if (query.isEmpty) return [];
     
-    // Get all location IDs that have feedback
-    final Set<String> locationIdsWithFeedback = _feedback
-        .map((feedback) => feedback.locationId)
-        .toSet();
-    
-    // Search all locations first
-    final results = await _databaseService.searchLocations(query);
-    
-    // Filter to only include locations with feedback
-    final filteredResults = results.where((location) => 
-        locationIdsWithFeedback.contains(location.id)).toList();
-    
-    print("Filtered from ${results.length} to ${filteredResults.length} results with feedback");
-    return filteredResults;
-  } catch (e) {
-    print("Error searching locations with feedback: $e");
-    _setError(e.toString());
-    return [];
-  } finally {
-    _setLoading(false);
+    _setLoading(true);
+    try {
+      print("Searching locations with feedback for query: $query");
+      
+      // Get all location IDs that have feedback
+      final Set<String> locationIdsWithFeedback = _feedback
+          .map((feedback) => feedback.locationId)
+          .toSet();
+      
+      // Search all locations first
+      final results = await _databaseService.searchLocations(query);
+      
+      // Filter to only include locations with feedback
+      final filteredResults = results.where((location) => 
+          locationIdsWithFeedback.contains(location.id)).toList();
+      
+      print("Filtered from ${results.length} to ${filteredResults.length} results with feedback");
+      return filteredResults;
+    } catch (e) {
+      print("Error searching locations with feedback: $e");
+      _setError(e.toString());
+      return [];
+    } finally {
+      _setLoading(false);
+    }
   }
-}
 
   // Search locations
   Future<List<LocationModel>> searchLocations(String query) async {
@@ -279,17 +318,17 @@ Future<List<LocationModel>> searchLocationsWithFeedback(String query) async {
     }
   }
 
-// Get all locations that have feedback
-List<LocationModel> getLocationsWithFeedback() {
-  // Create a set of location IDs that have feedback
-  final Set<String> locationIdsWithFeedback = _feedback
-      .map((feedback) => feedback.locationId)
-      .toSet();
-  
-  // Filter locations to only include those with feedback
-  return _locations.where((location) => 
-      locationIdsWithFeedback.contains(location.id)).toList();
-}
+  // Get all locations that have feedback
+  List<LocationModel> getLocationsWithFeedback() {
+    // Create a set of location IDs that have feedback
+    final Set<String> locationIdsWithFeedback = _feedback
+        .map((feedback) => feedback.locationId)
+        .toSet();
+    
+    // Filter locations to only include those with feedback
+    return _locations.where((location) => 
+        locationIdsWithFeedback.contains(location.id)).toList();
+  }
 
   // Add feedback with improved error handling
   Future<bool> addFeedback({
@@ -337,8 +376,14 @@ List<LocationModel> getLocationsWithFeedback() {
       
       print("Feedback added successfully");
       
-      // Refresh the feedback list
-      loadFeedback();
+      // Refresh the feedback lists
+      if (user.role == AppConstants.roleBuddy) {
+        // If buddy, refresh pending feedback
+        loadPendingFeedback();
+      } else {
+        // Otherwise refresh approved feedback
+        loadFeedback();
+      }
       
       return true;
     } catch (e) {
@@ -350,27 +395,23 @@ List<LocationModel> getLocationsWithFeedback() {
     }
   }
 
-  // Add comment to feedback
-  Future<bool> addComment({
-    required String feedbackId,
-    required UserModel user,
-    required String comment,
-  }) async {
+  // Approve feedback (for admin)
+  Future<bool> approveFeedback(String feedbackId) async {
     _setLoading(true);
     try {
-      print("Adding comment to feedback: $feedbackId");
-      await _databaseService.addComment(
+      print("Approving feedback: $feedbackId");
+      await _databaseService.updateFeedbackStatus(
         feedbackId: feedbackId,
-        user: user,
-        comment: comment,
+        status: AppConstants.feedbackStatusApproved,
       );
       
-      // Refresh feedback list
+      // Refresh both pending and approved feedback
+      loadPendingFeedback();
       loadFeedback();
       
       return true;
     } catch (e) {
-      print("Error in LocationProvider.addComment: $e");
+      print("Error approving feedback: $e");
       _setError(e.toString());
       return false;
     } finally {
@@ -378,7 +419,56 @@ List<LocationModel> getLocationsWithFeedback() {
     }
   }
 
-  // Toggle like
+  // Reject feedback (for admin)
+  Future<bool> rejectFeedback(String feedbackId) async {
+    _setLoading(true);
+    try {
+      print("Rejecting feedback: $feedbackId");
+      await _databaseService.updateFeedbackStatus(
+        feedbackId: feedbackId,
+        status: AppConstants.feedbackStatusRejected,
+      );
+      
+      // Refresh pending feedback list
+      loadPendingFeedback();
+      
+      return true;
+    } catch (e) {
+      print("Error rejecting feedback: $e");
+      _setError(e.toString());
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<FeedbackModel> addComment({
+    required String feedbackId,
+    required UserModel user,
+    required String comment,
+  }) async {
+    _setLoading(true);
+    try {
+      print("Adding comment to feedback: $feedbackId");
+      final updatedFeedback = await _databaseService.addComment(
+        feedbackId: feedbackId,
+        user: user,
+        comment: comment,
+      );
+      
+      // Refresh feedback lists
+      loadFeedback();
+      
+      return updatedFeedback;
+    } catch (e) {
+      print("Error in LocationProvider.addComment: $e");
+      _setError(e.toString());
+      throw Exception('Error adding comment: $e');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<bool> toggleLike({
     required String feedbackId,
     required String userId,
@@ -437,6 +527,7 @@ List<LocationModel> getLocationsWithFeedback() {
       await Future.delayed(Duration(milliseconds: 300));
       loadLocations();
       loadFeedback();
+      loadPendingFeedback();
       await getCurrentLocation();
     } catch (e) {
       print("Error refreshing all data: $e");

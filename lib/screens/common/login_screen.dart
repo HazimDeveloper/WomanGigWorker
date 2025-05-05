@@ -46,6 +46,13 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
+  void _fillWorkerCredentials() {
+    setState(() {
+      _emailController.text = 'nini@worker.gmail.com';
+      _passwordController.text = 'password123';
+    });
+  }
+
   void _fillCustomerCredentials() {
     setState(() {
       _emailController.text = 'nini@gmail.com';
@@ -92,6 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
         } else if (authProvider.isBuddy) {
           Navigator.of(context).pushReplacementNamed(BuddyHomeScreen.routeName);
         } else {
+          // Both worker and customer use the same home screen
           Navigator.of(context).pushReplacementNamed(CustomerHomeScreen.routeName);
         }
       } else if (mounted) {
@@ -246,6 +254,41 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 32),
+                    
+                    // Quick Login Options (for development)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'QUICK LOGIN (DEMO)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black54,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _buildQuickLoginButton('CUSTOMER', AppColors.secondary, _fillCustomerCredentials),
+                              _buildQuickLoginButton('WORKER', Colors.teal, _fillWorkerCredentials),
+                              _buildQuickLoginButton('BUDDY', Colors.purple, _fillBuddyCredentials),
+                              _buildQuickLoginButton('ADMIN', Colors.deepPurple, _fillAdminCredentials),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

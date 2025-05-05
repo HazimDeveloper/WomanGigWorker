@@ -11,6 +11,7 @@ class UserModel {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? photoBase64;
+  
   UserModel({
     required this.id,
     required this.username,
@@ -25,6 +26,12 @@ class UserModel {
     required this.updatedAt,
     this.photoBase64,
   });
+
+  // Helper getters for role-based checks
+  bool get isCustomer => role == 'customer';
+  bool get isWorker => role == 'worker';
+  bool get isBuddy => role == 'buddy';
+  bool get isAdmin => role == 'admin';
 
   // Create from Firebase
   factory UserModel.fromMap(Map<String, dynamic> map, String id) {
@@ -76,7 +83,7 @@ class UserModel {
     String? phoneNumber,
     bool? isActive,
     DateTime? updatedAt,
-     String? photoBase64,
+    String? photoBase64,
   }) {
     return UserModel(
       id: this.id,
