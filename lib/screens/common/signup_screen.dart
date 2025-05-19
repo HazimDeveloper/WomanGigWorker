@@ -6,7 +6,7 @@ import 'package:trust_me/screens/customer/customer_home_screen.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/common/custom_button.dart';
 import '../../widgets/common/custom_text_field.dart';
-import '../../utils/job_categories.dart'; // Import job categories
+import '../../utils/job_categories.dart'; 
 import '../../config/constants.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -26,14 +26,12 @@ class _SignupScreenState extends State<SignupScreen> {
   final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _customJobController = TextEditingController();
-  final _customCompanyController = TextEditingController();
+  final _companyController = TextEditingController(); // Changed to a direct controller
   String _selectedRole = AppConstants.roleCustomer;
   String? _selectedJob;
-  String? _selectedCompany;
   bool _isLoading = false;
   String? _errorMessage;
   bool _customJobSelected = false;
-  bool _customCompanySelected = false;
 
   @override
   void dispose() {
@@ -43,7 +41,7 @@ class _SignupScreenState extends State<SignupScreen> {
     _confirmPasswordController.dispose();
     _phoneController.dispose();
     _customJobController.dispose();
-    _customCompanyController.dispose();
+    _companyController.dispose(); // Dispose the controller
     super.dispose();
   }
 
@@ -104,69 +102,12 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  void _showCompanyOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
-      ),
-      builder: (BuildContext context) {
-        return Container(
-          height: MediaQuery.of(context).size.height * 0.6,
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Select Your Company',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: Companies.list.length,
-                  itemBuilder: (context, index) {
-                    final item = Companies.list[index];
-                    return ListTile(
-                      title: Text(item),
-                      selected: item == _selectedCompany,
-                      selectedTileColor: AppColors.primary.withOpacity(0.1),
-                      onTap: () {
-                        setState(() {
-                          _selectedCompany = item;
-                          _customCompanySelected = item == Companies.otherOption;
-                        });
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Validate job and company selections
+    // Validate job selection
     if (_selectedJob == null) {
       setState(() {
         _errorMessage = "Please select a job";
@@ -181,16 +122,9 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    if (_selectedCompany == null) {
+    if (_companyController.text.isEmpty) {
       setState(() {
-        _errorMessage = "Please select a company";
-      });
-      return;
-    }
-
-    if (_customCompanySelected && _customCompanyController.text.isEmpty) {
-      setState(() {
-        _errorMessage = "Please specify your company";
+        _errorMessage = "Please enter your company";
       });
       return;
     }
@@ -214,10 +148,8 @@ class _SignupScreenState extends State<SignupScreen> {
             ? _customJobController.text.trim()
             : _selectedJob ?? '';
             
-        // Determine company value (custom or selected)
-        final String companyValue = _customCompanySelected && _customCompanyController.text.isNotEmpty
-            ? _customCompanyController.text.trim()
-            : _selectedCompany ?? '';
+        // Get company value directly from the input field
+        final String companyValue = _companyController.text.trim();
 
         // Update additional user info
         await Provider.of<AuthProvider>(context, listen: false).updateUser(
@@ -402,6 +334,45 @@ class _SignupScreenState extends State<SignupScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
+
+                    // User Role Selection
+                    const Text(
+                      'ACCOUNT TYPE',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          // Role selection tiles with improved visual appearance
+                          _buildRoleSelectionTile(
+                            title: 'User',
+                            subtitle: 'I want to use the app for safety information',
+                            icon: Icons.person,
+                            value: AppConstants.roleCustomer,
+                            color: AppColors.secondary,
+                          ),
+                          const Divider(height: 1),
+                          _buildRoleSelectionTile(
+                            title: 'Buddy',
+                            subtitle: 'I want to help by reporting safety issues',
+                            icon: Icons.support_agent,
+                            value: AppConstants.roleBuddy,
+                            color: Colors.purple,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     
                     // Job Field
                     const Text(
@@ -457,7 +428,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ],
                     const SizedBox(height: 16),
                     
-                    // Company Field
+                    // Company Field - Changed to direct input
                     const Text(
                       'COMPANY',
                       style: TextStyle(
@@ -467,48 +438,17 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    // Company Selection with BottomSheet
-                    GestureDetector(
-                      onTap: () => _showCompanyOptions(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                _selectedCompany ?? 'Select your company',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: _selectedCompany == null ? Colors.grey : Colors.black,
-                                ),
-                              ),
-                            ),
-                            const Icon(Icons.arrow_drop_down, color: Colors.grey),
-                          ],
-                        ),
-                      ),
+                    CustomTextField(
+                      controller: _companyController,
+                      textInputAction: TextInputAction.next,
+                      hintText: 'Enter your company name',
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your company name';
+                        }
+                        return null;
+                      },
                     ),
-                    // Custom Company Input (shows when "Others" is selected)
-                    if (_customCompanySelected) ...[
-                      const SizedBox(height: 16),
-                      const Text(
-                        'SPECIFY YOUR COMPANY',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      CustomTextField(
-                        controller: _customCompanyController,
-                        textInputAction: TextInputAction.next,
-                      ),
-                    ],
                     const SizedBox(height: 16),
                     
                     // Phone Field
@@ -562,6 +502,77 @@ class _SignupScreenState extends State<SignupScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+  
+  // Helper method to build a role selection tile
+  Widget _buildRoleSelectionTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required String value,
+    required Color color,
+  }) {
+    bool isSelected = _selectedRole == value;
+    
+    return InkWell(
+      onTap: () {
+        setState(() {
+          _selectedRole = value;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? color : Colors.grey,
+              size: 28,
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? color : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Radio<String>(
+              value: value,
+              groupValue: _selectedRole,
+              activeColor: color,
+              onChanged: (newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _selectedRole = newValue;
+                  });
+                }
+              },
+            ),
+          ],
         ),
       ),
     );

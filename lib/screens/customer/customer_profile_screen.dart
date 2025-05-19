@@ -8,12 +8,13 @@ import '../../providers/auth_provider.dart';
 import '../../providers/user_provider.dart';
 import '../../widgets/common/custom_button.dart';
 import '../../widgets/common/custom_text_field.dart';
-import '../../widgets/common/custom_dropdown.dart'; // Import the new dropdown widget
-import '../../utils/job_categories.dart'; // Import job categories
+import '../../widgets/common/custom_dropdown.dart';
+import '../../utils/job_categories.dart';
 import '../../config/constants.dart';
 import '../../screens/common/login_screen.dart';
 import '../../services/storage_service.dart';
 import '../../utils/image_util.dart';
+
 class CustomerProfileScreen extends StatefulWidget {
   static const String routeName = '/customer/profile';
 
@@ -27,15 +28,13 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _customJobController = TextEditingController();
-  final TextEditingController _customCompanyController = TextEditingController();
+  final TextEditingController _companyController = TextEditingController(); // Changed to direct controller
   bool _isEditing = false;
   bool _isLoading = false;
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
   String? _selectedJob;
-  String? _selectedCompany;
   bool _customJobSelected = false;
-  bool _customCompanySelected = false;
 
   @override
   void initState() {
@@ -47,7 +46,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
   void dispose() {
     _phoneController.dispose();
     _customJobController.dispose();
-    _customCompanyController.dispose();
+    _companyController.dispose(); // Dispose the controller
     super.dispose();
   }
 
@@ -67,16 +66,8 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         _customJobSelected = true;
       }
       
-      // Handle company selection
-      String userCompany = user.company ?? '';
-      if (Companies.list.contains(userCompany)) {
-        _selectedCompany = userCompany;
-        _customCompanySelected = false;
-      } else if (userCompany.isNotEmpty) {
-        _selectedCompany = Companies.otherOption;
-        _customCompanyController.text = userCompany;
-        _customCompanySelected = true;
-      }
+      // Set company text directly
+      _companyController.text = user.company ?? '';
     }
   }
 
@@ -89,71 +80,70 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     }
   }
 
- Future<void> _updateProfile() async {
-  if (!_formKey.currentState!.validate()) {
-    return;
-  }
-
-  setState(() {
-    _isLoading = true;
-  });
-
-  try {
-    // Convert image to base64 if selected
-    String? photoBase64;
-    if (_imageFile != null) {
-      photoBase64 = await ImageUtil.fileToBase64(_imageFile!);
-      if (photoBase64 == null) {
-        throw Exception('Failed to convert image');
-      }
+  Future<void> _updateProfile() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
     }
-    
-    // Other profile data
-    final String jobValue = _customJobSelected && _customJobController.text.isNotEmpty
-        ? _customJobController.text.trim()
-        : _selectedJob ?? '';
-        
-    final String companyValue = _customCompanySelected && _customCompanyController.text.isNotEmpty
-        ? _customCompanyController.text.trim()
-        : _selectedCompany ?? '';
-    
-    // Update user with base64 image
-    final success = await Provider.of<AuthProvider>(context, listen: false).updateUser(
-      job: jobValue,
-      company: companyValue,
-      phoneNumber: _phoneController.text.trim(),
-      photoBase64: photoBase64, // Use base64 instead of URL
-    );
-    
-    if (success && mounted) {
-      setState(() {
-        _isEditing = false;
-        _imageFile = null;
-      });
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Convert image to base64 if selected
+      String? photoBase64;
+      if (_imageFile != null) {
+        photoBase64 = await ImageUtil.fileToBase64(_imageFile!);
+        if (photoBase64 == null) {
+          throw Exception('Failed to convert image');
+        }
+      }
       
+      // Other profile data
+      final String jobValue = _customJobSelected && _customJobController.text.isNotEmpty
+          ? _customJobController.text.trim()
+          : _selectedJob ?? '';
+          
+      // Get company value directly
+      final String companyValue = _companyController.text.trim();
+      
+      // Update user with base64 image
+      final success = await Provider.of<AuthProvider>(context, listen: false).updateUser(
+        job: jobValue,
+        company: companyValue,
+        phoneNumber: _phoneController.text.trim(),
+        photoBase64: photoBase64, // Use base64 instead of URL
+      );
+      
+      if (success && mounted) {
+        setState(() {
+          _isEditing = false;
+          _imageFile = null;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error updating profile: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully'),
-          backgroundColor: Colors.green,
+        SnackBar(
+          content: Text('Error updating profile. Please try again.'),
+          backgroundColor: Colors.red,
         ),
       );
-    }
-  } catch (e) {
-    print('Error updating profile: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error updating profile. Please try again.'),
-        backgroundColor: Colors.red,
-      ),
-    );
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
-}
 
   Future<void> _signOut() async {
     setState(() {
@@ -244,28 +234,28 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                   alignment: Alignment.bottomRight,
                   children: [
                     CircleAvatar(
-  radius: 60,
-  backgroundColor: Colors.grey.shade200,
-  backgroundImage: _imageFile != null
-      ? FileImage(_imageFile!) as ImageProvider
-      : (user.photoBase64 != null 
-          ? MemoryImage(base64Decode(user.photoBase64!)) as ImageProvider
-          : (user.photoUrl != null
-              ? CachedNetworkImageProvider(user.photoUrl!) as ImageProvider
-              : null)),
-  child: (_imageFile == null && user.photoBase64 == null && user.photoUrl == null)
-      ? Text(
-          user.username.isNotEmpty
-              ? user.username[0].toUpperCase()
-              : '?',
-          style: const TextStyle(
-            fontSize: 40,
-            fontWeight: FontWeight.bold,
-            color: Colors.black54,
-          ),
-        )
-      : null,
-),
+                      radius: 60,
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage: _imageFile != null
+                          ? FileImage(_imageFile!) as ImageProvider
+                          : (user.photoBase64 != null 
+                              ? MemoryImage(base64Decode(user.photoBase64!)) as ImageProvider
+                              : (user.photoUrl != null
+                                  ? CachedNetworkImageProvider(user.photoUrl!) as ImageProvider
+                                  : null)),
+                      child: (_imageFile == null && user.photoBase64 == null && user.photoUrl == null)
+                          ? Text(
+                              user.username.isNotEmpty
+                                  ? user.username[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                fontSize: 40,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black54,
+                              ),
+                            )
+                          : null,
+                    ),
                     if (_isEditing)
                       Container(
                         padding: const EdgeInsets.all(8),
@@ -352,7 +342,7 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                 ),
                 const SizedBox(height: 16),
                 
-                // Company Dropdown
+                // Company Input Field
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -365,32 +355,17 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    CustomDropdown(
-                      hintText: 'Select your company',
-                      value: _selectedCompany,
-                      items: Companies.list,
-                      isSearchable: true,
-                      onChanged: (String? value) {
-                        setState(() {
-                          _selectedCompany = value;
-                          _customCompanySelected = value == Companies.otherOption;
-                        });
+                    CustomTextField(
+                      controller: _companyController,
+                      textInputAction: TextInputAction.next,
+                      hintText: 'Enter your company name',
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your company name';
+                        }
+                        return null;
                       },
                     ),
-                    if (_customCompanySelected) ...[
-                      const SizedBox(height: 8),
-                      CustomTextField(
-                        labelText: 'SPECIFY YOUR COMPANY',
-                        controller: _customCompanyController,
-                        textInputAction: TextInputAction.next,
-                        validator: (value) {
-                          if (_customCompanySelected && (value == null || value.isEmpty)) {
-                            return 'Please specify your company';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -447,32 +422,32 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     );
   }
 
- Widget _buildInfoItem(String label, String value) {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.center, // Keep this
-    children: [
-      Text(
-        '$label: ',
-        style: const TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
-          color: Colors.black54,
-        ),
-      ),
-      // Add Expanded widget to handle text overflow
-      Expanded(
-        child: Text(
-          value,
+  Widget _buildInfoItem(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center, // Keep this
+      children: [
+        Text(
+          '$label: ',
           style: const TextStyle(
             fontSize: 16,
-            color: Colors.black,
+            fontWeight: FontWeight.bold,
+            color: Colors.black54,
           ),
-          // Add overflow handling
-          overflow: TextOverflow.ellipsis,
-          maxLines: 2,
         ),
-      ),
-    ],
-  );
-}
+        // Add Expanded widget to handle text overflow
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.black,
+            ),
+            // Add overflow handling
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+        ),
+      ],
+    );
+  }
 }
