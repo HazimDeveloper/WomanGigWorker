@@ -28,6 +28,7 @@ class CustomerUploadScreen extends StatefulWidget {
 
 class _CustomerUploadScreenState extends State<CustomerUploadScreen> with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  final GlobalKey<RiskMapState> _mapKey = GlobalKey<RiskMapState>();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _feedbackController = TextEditingController();
   double _safetyRating = 3.0;
@@ -38,13 +39,13 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
   List<LocationModel> _searchResults = [];
   
   // Map related variables
-  final GlobalKey<RiskMapState> _mapKey = GlobalKey<RiskMapState>();
   bool _showMap = false;
   bool _isMapSelectionMode = false;
   LatLng? _selectedPosition;
   
   // Tab controller for switching between search and map
   late TabController _tabController;
+  final TextEditingController _locationNameController = TextEditingController();
 
   @override
   void initState() {
@@ -63,6 +64,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
     _locationController.dispose();
     _feedbackController.dispose();
     _tabController.dispose();
+    _locationNameController.dispose();
     super.dispose();
   }
   
@@ -74,7 +76,12 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final XFile? pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800, // Optimize image size
+      maxHeight: 800,
+      imageQuality: 70,
+    );
     
     if (pickedFile != null) {
       setState(() {
@@ -101,27 +108,27 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
       print("Searching for locations with query: $query");
       
       final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-      final results = await locationProvider.searchLocations(query);
-      print("Search results: ${results.length} locations found");
       
-      if (results.isEmpty) {
-        // If no exact matches, try to add the entered text as a new location
-        final newLocation = await locationProvider.addLocation(
-          name: query,
-          latitude: AppGeoConstants.jitraLatitude, // Default to Jitra center
-          longitude: AppGeoConstants.jitraLongitude,
-        );
-        
-        if (newLocation != null) {
-          results.add(newLocation);
-          print("Created new location: ${newLocation.name} with Jitra coordinates");
+      // Use the method that specifically searches for locations with feedback
+      final results = await locationProvider.searchLocationsWithFeedback(query);
+      
+      // Filter to only include locations within Jitra
+      final locationService = LocationService();
+      final filteredResults = results.where((location) {
+        // Skip invalid coordinates and locations outside Jitra
+        if (location.latitude == 0 || location.longitude == 0) {
+          return false;
         }
-      }
+        return locationService.isInJitraArea(location.latitude, location.longitude);
+      }).toList();
       
       setState(() {
-        _searchResults = results;
+        _searchResults = filteredResults;
         _isLoading = false;
       });
+      
+      print("Filtered to ${filteredResults.length} locations in Jitra with feedback");
+      
     } catch (e) {
       print("Error searching locations: $e");
       setState(() {
@@ -139,68 +146,40 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
   }
 
   void _selectLocation(LocationModel location) {
-    // Check if the location has valid coordinates
-    if (location.latitude == 0 || location.longitude == 0) {
-      print("Location ${location.name} has invalid coordinates, setting to Jitra center");
-      
-      // Create a copy with valid coordinates
-      final fixedLocation = location.copyWith(
-        latitude: AppGeoConstants.jitraLatitude,
-        longitude: AppGeoConstants.jitraLongitude
-      );
-      
-      setState(() {
-        _selectedLocation = fixedLocation;
-        _locationController.text = fixedLocation.name;
-        _showSearchResults = false;
-      });
-      
-      // Inform the user that default coordinates are being used
+    // Check if the location has valid coordinates and is in Jitra
+    final locationService = LocationService();
+    final bool isInJitra = locationService.isInJitraArea(
+      location.latitude, 
+      location.longitude
+    );
+    
+    if (location.latitude == 0 || location.longitude == 0 || !isInJitra) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Using default Jitra coordinates for this location'),
+          content: Text('Cannot select location outside Jitra area or with invalid coordinates'),
           backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
         ),
       );
-    } else {
-      // Check if location is within Jitra
-      final locationService = LocationService();
-      final bool isInJitra = locationService.isInJitraArea(
-        location.latitude, 
-        location.longitude
-      );
-      
-      if (!isInJitra) {
-        // If outside Jitra, use Jitra center coordinates
-        final fixedLocation = location.copyWith(
-          latitude: AppGeoConstants.jitraLatitude,
-          longitude: AppGeoConstants.jitraLongitude
-        );
-        
-        setState(() {
-          _selectedLocation = fixedLocation;
-          _locationController.text = fixedLocation.name;
-          _showSearchResults = false;
-        });
-        
-        // Inform the user
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Location adjusted to Jitra area'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else {
-        // Location is valid and in Jitra
-        setState(() {
-          _selectedLocation = location;
-          _locationController.text = location.name;
-          _showSearchResults = false;
-        });
-      }
+      return;
     }
+
+    setState(() {
+      _selectedLocation = location;
+      _locationController.text = location.name;
+      _showSearchResults = false;
+    });
+    
+    // Switch back to form tab
+    _tabController.animateTo(0);
+    
+    // Show confirmation
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Selected location: ${location.name}'),
+        backgroundColor: Colors.green,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   // Handle map tap for selecting a location
@@ -222,7 +201,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Selected location is outside Jitra area. Please select a location within Jitra.'),
+          content: Text('Selected location is outside Jitra area. Please select a location within the blue boundary.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -231,7 +210,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
 
   // Show dialog to name a new location
   void _showAddLocationDialog(LatLng position) {
-    final TextEditingController nameController = TextEditingController();
+    _locationNameController.text = ""; // Clear previous input
     
     showDialog(
       context: context,
@@ -243,17 +222,23 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
             const Text('Enter a name for this location:'),
             const SizedBox(height: 12),
             TextField(
-              controller: nameController,
+              controller: _locationNameController,
               decoration: const InputDecoration(
                 hintText: 'Location name',
                 border: OutlineInputBorder(),
               ),
               autofocus: true,
+              textCapitalization: TextCapitalization.words,
             ),
             const SizedBox(height: 8),
             Text(
               'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}',
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'This location will be added to the map if approved.',
+              style: TextStyle(fontSize: 12, color: Colors.blue),
             ),
           ],
         ),
@@ -271,7 +256,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
           ),
           ElevatedButton(
             onPressed: () async {
-              final name = nameController.text.trim();
+              final name = _locationNameController.text.trim();
               if (name.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -331,6 +316,9 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
         
         // Switch back to form tab
         _tabController.animateTo(0);
+        
+        // Force map data refresh
+        locationProvider.loadLocations();
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -361,46 +349,21 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
       return;
     }
 
-    // Validate coordinates
-    if (_selectedLocation!.latitude == 0 || _selectedLocation!.longitude == 0) {
-      // Fix coordinates before uploading
-      _selectedLocation = _selectedLocation!.copyWith(
-        latitude: AppGeoConstants.jitraLatitude,
-        longitude: AppGeoConstants.jitraLongitude
-      );
-      
-      // Inform the user
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Using default Jitra coordinates for this location'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-
-    // Check if the selected location is in Jitra area
+    // Validate coordinates and location
     final locationService = LocationService();
     final bool isInJitra = locationService.isInJitraArea(
       _selectedLocation!.latitude, 
       _selectedLocation!.longitude
     );
     
-    if (!isInJitra) {
-      // Adjust coordinates to Jitra center
-      _selectedLocation = _selectedLocation!.copyWith(
-        latitude: AppGeoConstants.jitraLatitude,
-        longitude: AppGeoConstants.jitraLongitude
-      );
-      
-      // Inform the user
+    if (_selectedLocation!.latitude == 0 || _selectedLocation!.longitude == 0 || !isInJitra) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Location adjusted to Jitra area'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
+          content: Text('Selected location is invalid or outside Jitra area. Please select a different location.'),
+          backgroundColor: Colors.red,
         ),
       );
+      return;
     }
 
     setState(() {
@@ -425,7 +388,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
         }
       }
       
-      // Add feedback with the validated location
+      // Add feedback
       final success = await Provider.of<LocationProvider>(context, listen: false).addFeedback(
         user: user,
         locationId: _selectedLocation!.id,
@@ -445,10 +408,19 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
           _imageFile = null;
         });
         
+        // Force refresh map data
+        final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+        locationProvider.loadLocations();
+        locationProvider.loadFeedback();
+        
+        // Switch to the map tab to show the updated information
+        _tabController.animateTo(1);
+        
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Feedback uploaded successfully'),
+            content: Text('Feedback uploaded successfully! Check the map to see updated safety information.'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
           ),
         );
       }
@@ -471,16 +443,13 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
 
   @override
   Widget build(BuildContext context) {
-    final locationProvider = Provider.of<LocationProvider>(context);
-    final locations = locationProvider.locations;
-
     return Scaffold(
       backgroundColor: AppColors.primary,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
         title: const Text(
-          ' ADD SAFETY INFORMATION',
+          'ADD SAFETY INFORMATION',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -511,7 +480,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
           _buildFeedbackForm(),
           
           // Tab 2: Map Selection
-          _buildMapSelection(locations),
+          _buildMapSelection(),
         ],
       ),
     );
@@ -571,6 +540,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
                             }
                             return null;
                           },
+                          readOnly: true, // Make it read-only to enforce selection from search
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -748,34 +718,17 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
                   ),
                 ],
               ),
-              child: _isLoading
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  : _searchResults.isEmpty
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Text(
-                              'No locations found',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: _searchResults.length,
-                          itemBuilder: (context, index) {
-                            final location = _searchResults[index];
-                            return _buildLocationItem(location);
-                          },
-                        ),
+              child: Consumer<LocationProvider>(
+                builder: (context, locationProvider, _) {
+                  return LocationSearch(
+                    onSearch: _searchLocations,
+                    onLocationSelected: _selectLocation,
+                    searchResults: _searchResults,
+                    isLoading: _isLoading,
+                    emptyMessage: 'No locations found with feedback',
+                  );
+                },
+              ),
             ),
           ),
         
@@ -792,11 +745,12 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
   }
 
   // Build the map selection tab
-  Widget _buildMapSelection(List<LocationModel> locations) {
+  Widget _buildMapSelection() {
     return Stack(
       children: [
         Consumer<LocationProvider>(
           builder: (context, locationProvider, _) {
+            final List<LocationModel> locations = locationProvider.locations;
             final currentPosition = locationProvider.currentPosition;
             
             return RiskMap(
@@ -858,26 +812,34 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
               ],
             ),
             child: Column(
               children: [
-                const Text(
-                  'Choose a location on the map',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
+                Row(
+                  children: const [
+                    Icon(Icons.info_outline, color: Colors.blue, size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'You can only add feedback for locations within Jitra area (blue circle)',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _isMapSelectionMode 
                       ? 'Tap anywhere on the map to add a new location'
-                      : 'Tap the button below to start selecting a location',
+                      : 'Tap on existing locations or use the + button to add a new one',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[700],
@@ -897,88 +859,6 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
             ),
           ),
       ],
-    );
-  }
-  
-  // Build a location item for search results
-  Widget _buildLocationItem(LocationModel location) {
-    Color statusColor;
-    switch (location.safetyLevel) {
-      case AppConstants.safeLevelSafe:
-        statusColor = AppColors.safeGreen;
-        break;
-      case AppConstants.safeLevelModerate:
-        statusColor = AppColors.moderateYellow;
-        break;
-      case AppConstants.safeLevelHighRisk:
-        statusColor = AppColors.highRiskRed;
-        break;
-      default:
-        statusColor = Colors.grey;
-    }
-
-    bool hasValidCoordinates = location.latitude != 0 && location.longitude != 0;
-
-    return ListTile(
-      leading: Icon(
-        Icons.location_on,
-        color: statusColor,
-      ),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              location.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (!hasValidCoordinates)
-            Tooltip(
-              message: 'Using Jitra coordinates',
-              child: Icon(
-                Icons.info_outline,
-                color: Colors.orange,
-                size: 16,
-              ),
-            ),
-        ],
-      ),
-      subtitle: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 2,
-            ),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              location.safetyLevel.replaceAll('_', ' ').toUpperCase(),
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: statusColor,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Rating: ${location.averageSafetyRating.toStringAsFixed(1)} (${location.ratingCount})',
-              style: const TextStyle(
-                fontSize: 12,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-      onTap: () => _selectLocation(location),
     );
   }
 }

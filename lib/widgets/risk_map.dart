@@ -33,6 +33,15 @@ class RiskMapState extends State<RiskMap> {
   
   // Add a variable to track if we're in location selection mode
   bool _inSelectionMode = false;
+  
+  // Variables for restricting map movement
+  final LatLng _jitraCenterPosition = LatLng(
+    AppGeoConstants.jitraLatitude,
+    AppGeoConstants.jitraLongitude
+  );
+  
+  // Set bounds for Jitra area - slightly larger than the maxDistance to allow smoother UX
+  final double _maxBoundsDistance = AppGeoConstants.maxDistanceFromJitraKm * 1.2; // 20% larger than the actual limit
 
   @override
   void initState() {
@@ -48,17 +57,64 @@ class RiskMapState extends State<RiskMap> {
     }
   }
 
-  
+  // Add a helper method to check if a position is within Jitra area
+  bool _isInJitraArea(LatLng position) {
+    final locationService = LocationService();
+    return locationService.isInJitraArea(position.latitude, position.longitude);
+  }
+
+  // Method to enforce camera bounds
+  Future<void> _enforceJitraBounds(GoogleMapController controller) async {
+    LatLngBounds visibleRegion = await controller.getVisibleRegion();
+    
+    // Calculate the center of the visible region
+    LatLng visibleCenter = LatLng(
+      (visibleRegion.northeast.latitude + visibleRegion.southwest.latitude) / 2,
+      (visibleRegion.northeast.longitude + visibleRegion.southwest.longitude) / 2
+    );
+    
+    // Calculate distance from Jitra center to visible center
+    final locationService = LocationService();
+    double distanceInMeters = locationService.calculateDistance(
+      _jitraCenterPosition, 
+      visibleCenter
+    );
+    
+    // Convert to km
+    double distanceInKm = distanceInMeters / 1000;
+    
+    // If too far, animate back to Jitra center
+    if (distanceInKm > _maxBoundsDistance) {
+      print("Map dragged too far ($distanceInKm km). Restricting to Jitra area.");
+      controller.animateCamera(
+        CameraUpdate.newLatLngZoom(_jitraCenterPosition, widget.initialZoom)
+      );
+    }
+  }
 
   void _updateMarkersAndCircles() {
     final Set<Marker> markers = {};
     final Set<Circle> circles = {};
 
+    int validLocations = 0;
+    int skippedLocations = 0;
+
     for (final location in widget.locations) {
       // Skip locations with invalid coordinates
       if (location.latitude == 0 && location.longitude == 0) {
+        print("Skipping location with invalid coordinates: ${location.name} (ID: ${location.id})");
+        skippedLocations++;
         continue;
       }
+      
+      // Skip locations outside Jitra area
+      if (!_isInJitraArea(LatLng(location.latitude, location.longitude))) {
+        print("Skipping location outside Jitra area: ${location.name}");
+        skippedLocations++;
+        continue;
+      }
+      
+      validLocations++;
 
       // Create marker
       final marker = Marker(
@@ -101,10 +157,23 @@ class RiskMapState extends State<RiskMap> {
       circles.add(circle);
     }
 
+    // Add Jitra boundary circle
+    final jitraBoundaryCircle = Circle(
+      circleId: const CircleId('jitra_boundary'),
+      center: _jitraCenterPosition,
+      radius: AppGeoConstants.maxDistanceFromJitraKm * 1000, // Convert km to meters
+      fillColor: Colors.blue.withOpacity(0.05),
+      strokeColor: Colors.blue,
+      strokeWidth: 1,
+    );
+    circles.add(jitraBoundaryCircle);
+
     // If we have a selected position marker, add it back to the markers
     if (_selectedPositionMarker != null) {
       markers.add(_selectedPositionMarker!);
     }
+
+    print("Map updated with $validLocations valid locations. Skipped $skippedLocations invalid locations.");
 
     setState(() {
       _markers = markers;
@@ -112,17 +181,11 @@ class RiskMapState extends State<RiskMap> {
     });
   }
 
-  // Add this method to handle map taps
+  // Handle map taps
   void _onMapTap(LatLng position) {
     if (_inSelectionMode) {
       // Check if the position is within Jitra area
-      final locationService = LocationService();
-      final bool isInJitra = locationService.isInJitraArea(
-        position.latitude, 
-        position.longitude
-      );
-      
-      if (isInJitra) {
+      if (_isInJitraArea(position)) {
         // Create a new marker for the selected position
         final newMarker = Marker(
           markerId: const MarkerId('selected_position'),
@@ -143,12 +206,13 @@ class RiskMapState extends State<RiskMap> {
         // Call the callback
         widget.onMapTapped?.call(position);
       } else {
-        // Show a message via callback that this is outside Jitra
-        final jitraPosition = LatLng(
-          AppGeoConstants.jitraLatitude,
-          AppGeoConstants.jitraLongitude
+        // Show a message that this is outside Jitra
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selected location is outside Jitra area. Please select a location within the blue circle.'),
+            backgroundColor: Colors.orange,
+          ),
         );
-        widget.onMapTapped?.call(jitraPosition);
       }
     }
   }
@@ -165,6 +229,11 @@ class RiskMapState extends State<RiskMap> {
     });
   }
 
+  // Add a method to refresh the map markers
+  void refreshMap() {
+    _updateMarkersAndCircles();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -172,7 +241,7 @@ class RiskMapState extends State<RiskMap> {
         GoogleMap(
           mapType: MapType.normal,
           initialCameraPosition: CameraPosition(
-            target: widget.initialPosition ?? const LatLng(6.2641, 100.4214), // Default to Jitra
+            target: widget.initialPosition ?? _jitraCenterPosition, // Default to Jitra
             zoom: widget.initialZoom,
           ),
           markers: _markers,
@@ -184,6 +253,21 @@ class RiskMapState extends State<RiskMap> {
             _controller.complete(controller);
           },
           onTap: _onMapTap, // Add the tap handler
+          onCameraMove: (CameraPosition position) {
+            // Check if the camera is being moved too far from Jitra
+            if (!_isInJitraArea(position.target)) {
+              // Let it move a bit beyond before restricting for better UX
+              if (position.zoom < 12) {
+                // If zoomed out too far, we'll handle in onCameraIdle
+                return;
+              }
+            }
+          },
+          onCameraIdle: () async {
+            // When camera stops moving, check if we need to enforce boundaries
+            final controller = await _controller.future;
+            _enforceJitraBounds(controller);
+          },
         ),
         
         // Selection mode indicator
@@ -206,7 +290,7 @@ class RiskMapState extends State<RiskMap> {
                 ],
               ),
               child: const Text(
-                'Tap on the map to select a location in Jitra area',
+                'Tap on the map to select a location in Jitra area (within blue circle)',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
@@ -215,6 +299,49 @@ class RiskMapState extends State<RiskMap> {
               ),
             ),
           ),
+        
+        // Jitra area explanation
+        Positioned(
+          top: 80,
+          right: 16,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      height: 12,
+                      width: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.4),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.blue, width: 1),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Jitra Area',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }

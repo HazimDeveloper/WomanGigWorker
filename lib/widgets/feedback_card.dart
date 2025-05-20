@@ -24,35 +24,35 @@ class FeedbackCard extends StatelessWidget {
     this.onAddComment,
   }) : super(key: key);
 
-Widget _buildBase64Image(String base64String) {
-  // Use a static cache for decoded images
-  final Map<String, Uint8List> _decodedImageCache = {};
-  
-  // Generate a short hash of the base64 string as the cache key
-  final String cacheKey = base64String.length.toString() + 
+  Widget _buildBase64Image(String base64String) {
+    // Use a static cache for decoded images
+    final Map<String, Uint8List> _decodedImageCache = {};
+    
+    // Generate a short hash of the base64 string as the cache key
+    final String cacheKey = base64String.length.toString() + 
                          base64String.substring(0, 10) + 
                          base64String.substring(base64String.length - 10);
-  
-  // Check if we already decoded this image
-  if (!_decodedImageCache.containsKey(cacheKey)) {
-    try {
-      // Decode only if not in cache
-      _decodedImageCache[cacheKey] = base64Decode(base64String);
-    } catch (e) {
-      print("Error decoding base64 image: $e");
-      return const Center(
-        child: Icon(Icons.broken_image, color: Colors.red, size: 40)
-      );
+    
+    // Check if we already decoded this image
+    if (!_decodedImageCache.containsKey(cacheKey)) {
+      try {
+        // Decode only if not in cache
+        _decodedImageCache[cacheKey] = base64Decode(base64String);
+      } catch (e) {
+        print("Error decoding base64 image: $e");
+        return const Center(
+          child: Icon(Icons.broken_image, color: Colors.red, size: 40)
+        );
+      }
     }
+    
+    // Use the cached decoded data
+    return Image.memory(
+      _decodedImageCache[cacheKey]!,
+      fit: BoxFit.cover,
+      gaplessPlayback: true, // Important to prevent flicker
+    );
   }
-  
-  // Use the cached decoded data
-  return Image.memory(
-    _decodedImageCache[cacheKey]!,
-    fit: BoxFit.cover,
-    gaplessPlayback: true, // Important to prevent flicker
-  );
-}
 
   @override
   Widget build(BuildContext context) {
@@ -206,54 +206,106 @@ else if (feedback.imageUrl != null)
     ),
   ),
             
-            // Actions
+            // Actions - Enhanced the like and comment UI
             Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  // Like button
+                  // Like button with enhanced UI
                   InkWell(
                     onTap: () => onLikeToggle?.call(!isLiked),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isLiked ? Icons.favorite : Icons.favorite_border,
-                          color: isLiked ? Colors.red : Colors.white,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          feedback.likedBy.length.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isLiked ? Colors.red.withOpacity(0.2) : Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isLiked ? Icons.favorite : Icons.favorite_border,
+                            color: isLiked ? Colors.red : Colors.white,
+                            size: 20,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Text(
+                            feedback.likedBy.length.toString(),
+                            style: TextStyle(
+                              color: isLiked ? Colors.red : Colors.white,
+                              fontSize: 14,
+                              fontWeight: isLiked ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  // Comment button
+                  const SizedBox(width: 12),
+                  
+                  // Comment button with enhanced UI
                   InkWell(
                     onTap: onAddComment,
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.comment_outlined,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          feedback.comments.length.toString(),
-                          style: const TextStyle(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.comment_outlined,
                             color: Colors.white,
-                            fontSize: 14,
+                            size: 20,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 4),
+                          Text(
+                            feedback.comments.length.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                  
+                  // Spacer to push view details to the right
+                  const Spacer(),
+                  
+                  // View Details button (shown if there are comments)
+                  if (feedback.comments.isNotEmpty)
+                    InkWell(
+                      onTap: onTap,
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: const [
+                            Text(
+                              'View All',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                            SizedBox(width: 2),
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.white,
+                              size: 10,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -319,11 +371,14 @@ else if (feedback.imageUrl != null)
                     if (feedback.comments.length > 1)
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          'View all ${feedback.comments.length} comments',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.white.withOpacity(0.7),
+                        child: GestureDetector(
+                          onTap: onTap,
+                          child: Text(
+                            'View all ${feedback.comments.length} comments',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white.withOpacity(0.7),
+                            ),
                           ),
                         ),
                       ),
@@ -335,6 +390,4 @@ else if (feedback.imageUrl != null)
       ),
     );
   }
-
-  
 }

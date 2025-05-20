@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -9,7 +8,6 @@ import '../../providers/location_provider.dart';
 import '../../widgets/feedback_card.dart';
 import '../../models/feedback_model.dart';
 import '../../config/constants.dart';
-import 'buddy_map_screen.dart';
 import 'buddy_profile_screen.dart';
 import '../../screens/customer/customer_upload_screen.dart'; // Import the upload screen
 
@@ -65,11 +63,35 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
   }
 
   Future<void> _handleLikeToggle(FeedbackModel feedback, bool isLiked) async {
-    final userId = Provider.of<AuthProvider>(context, listen: false).user!.id;
-    await Provider.of<LocationProvider>(context, listen: false).toggleLike(
-      feedbackId: feedback.id,
-      userId: userId,
-    );
+    try {
+      final userId = Provider.of<AuthProvider>(context, listen: false).user!.id;
+      await Provider.of<LocationProvider>(context, listen: false).toggleLike(
+        feedbackId: feedback.id,
+        userId: userId,
+      );
+      
+      // Show visual feedback
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isLiked ? 'Liked!' : 'Unliked'),
+            duration: const Duration(seconds: 1),
+            backgroundColor: isLiked ? Colors.pink : Colors.grey,
+          ),
+        );
+      }
+    } catch (e) {
+      print("Error toggling like: $e");
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showCommentDialog(FeedbackModel feedback) {
@@ -96,13 +118,37 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
           TextButton(
             onPressed: () async {
               if (commentController.text.trim().isNotEmpty) {
-                final userId = Provider.of<AuthProvider>(context, listen: false).user!;
-                await Provider.of<LocationProvider>(context, listen: false).addComment(
-                  feedbackId: feedback.id,
-                  user: userId,
-                  comment: commentController.text.trim(),
-                );
-                Navigator.of(context).pop();
+                try {
+                  final userId = Provider.of<AuthProvider>(context, listen: false).user!;
+                  await Provider.of<LocationProvider>(context, listen: false).addComment(
+                    feedbackId: feedback.id,
+                    user: userId,
+                    comment: commentController.text.trim(),
+                  );
+                  Navigator.of(context).pop();
+                  
+                  // Show success message
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Comment added successfully'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  print("Error adding comment: $e");
+                  // Show error message
+                  Navigator.of(context).pop();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
               }
             },
             child: const Text('POST'),
@@ -112,6 +158,54 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
     );
   }
   
+  // Add method to view all comments for a feedback item
+  void _viewAllComments(FeedbackModel feedback) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${feedback.comments.length} Comments'),
+        content: Container(
+          width: double.maxFinite,
+          height: 300,
+          child: ListView.builder(
+            itemCount: feedback.comments.length,
+            itemBuilder: (context, index) {
+              final comment = feedback.comments[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  radius: 12,
+                  backgroundColor: Colors.grey.shade200,
+                  child: Text(
+                    comment.username.isNotEmpty ? comment.username[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  comment.username,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                subtitle: Text(comment.text),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CLOSE'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<AuthProvider>(context).user;
@@ -131,10 +225,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
           // Home Feed Page - wrapped in KeepAlivePage to prevent rebuilds
           _buildBuddyHomeFeed(),
           
-          // Map Page
-          const KeepAlivePage(child: BuddyMapScreen()),
-          
-          // Add Upload Page for buddies
+          // Upload Page
           const KeepAlivePage(child: CustomerUploadScreen()),
           
           // Profile Page
@@ -156,10 +247,6 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.map),
-            label: 'Map',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.add_circle_outline),
             label: 'Upload',
           ),
@@ -173,7 +260,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
       floatingActionButton: _currentIndex == 0 ? FloatingActionButton(
         backgroundColor: AppColors.secondary,
         onPressed: () {
-          _pageController.jumpToPage(2); // Jump to upload page
+          _pageController.jumpToPage(1); // Jump to upload page
         },
         child: const Icon(Icons.add, color: Colors.white),
       ) : null,
@@ -238,7 +325,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'You are a Buddy user. Your safety information will need admin approval before showing to others.',
+                    'Your safety information will need admin approval before showing to others.',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.black87,
@@ -313,7 +400,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: () {
-                          _pageController.jumpToPage(2); // Jump to upload page
+                          _pageController.jumpToPage(1); // Jump to upload page
                         },
                         icon: const Icon(Icons.add),
                         label: const Text('Add feedback'),
@@ -339,7 +426,10 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                 feedback: feedback[index],
                 currentUserId: userId,
                 onTap: () {
-                  // View feedback details
+                  // View all comments if available
+                  if (feedback[index].comments.isNotEmpty) {
+                    _viewAllComments(feedback[index]);
+                  }
                 },
                 onLikeToggle: (isLiked) {
                   _handleLikeToggle(feedback[index], isLiked);
@@ -423,7 +513,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                       const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: () {
-                          _pageController.jumpToPage(2); // Jump to upload page
+                          _pageController.jumpToPage(1); // Jump to upload page
                         },
                         icon: const Icon(Icons.add),
                         label: const Text('Add new'),
@@ -457,7 +547,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                   heroTag: "addMoreFeedback",
                   backgroundColor: AppColors.secondary,
                   onPressed: () {
-                    _pageController.jumpToPage(2); // Jump to upload page
+                    _pageController.jumpToPage(1); // Jump to upload page
                   },
                   child: const Icon(Icons.add, color: Colors.white),
                 ),

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/location_model.dart';
 import '../config/constants.dart';
+import '../providers/location_provider.dart';
+import 'package:provider/provider.dart';
+import '../services/location_service.dart';
 
 class LocationSearch extends StatefulWidget {
   final Function(String query) onSearch;
@@ -25,11 +28,14 @@ class LocationSearch extends StatefulWidget {
 class _LocationSearchState extends State<LocationSearch> {
   final TextEditingController _searchController = TextEditingController();
   bool _showResults = false;
+  List<LocationModel> _feedbackLocations = [];
+  bool _loadingLocations = false;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _loadFeedbackLocations();
   }
 
   @override
@@ -37,6 +43,31 @@ class _LocationSearchState extends State<LocationSearch> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  // Load locations that have feedback
+  Future<void> _loadFeedbackLocations() async {
+    setState(() {
+      _loadingLocations = true;
+    });
+
+    try {
+      // Get locations with feedback from LocationProvider
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      final locationsWithFeedback = locationProvider.getLocationsWithFeedback();
+      
+      setState(() {
+        _feedbackLocations = locationsWithFeedback;
+        _loadingLocations = false;
+      });
+      
+      print("Loaded ${_feedbackLocations.length} locations with feedback for search");
+    } catch (e) {
+      print("Error loading feedback locations: $e");
+      setState(() {
+        _loadingLocations = false;
+      });
+    }
   }
 
   void _onSearchChanged() {
@@ -96,6 +127,67 @@ class _LocationSearchState extends State<LocationSearch> {
           ),
         ),
 
+        // Feedback Locations Info
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, color: Colors.blue, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'You can only add feedback to locations within Jitra area. Search from ${_feedbackLocations.length} locations with existing feedback, or add a new location on the map.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Recently Used Locations
+        if (!_showResults && _feedbackLocations.isNotEmpty)
+          Expanded(
+            child: Container(
+              color: Colors.white,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text(
+                      'LOCATIONS WITH FEEDBACK',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: _loadingLocations
+                        ? const Center(child: CircularProgressIndicator())
+                        : ListView.builder(
+                            itemCount: _feedbackLocations.length,
+                            itemBuilder: (context, index) {
+                              return _buildLocationItem(_feedbackLocations[index]);
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
         // Search Results
         if (_showResults)
           Expanded(
@@ -112,12 +204,32 @@ class _LocationSearchState extends State<LocationSearch> {
                       ? Center(
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
-                            child: Text(
-                              widget.emptyMessage,
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 16,
-                              ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.search_off,
+                                  color: Colors.grey,
+                                  size: 48,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  widget.emptyMessage,
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Try another search term or add a new location on the map',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 14,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
                           ),
                         )
@@ -155,6 +267,12 @@ class _LocationSearchState extends State<LocationSearch> {
         statusColor = Colors.grey;
     }
 
+    // Check if location is in Jitra
+    final bool isInJitra = LocationService().isInJitraArea(
+      location.latitude, 
+      location.longitude
+    );
+
     return ListTile(
       leading: Icon(
         Icons.location_on,
@@ -171,12 +289,14 @@ class _LocationSearchState extends State<LocationSearch> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          // Show coordinate status icon
-          if (!hasValidCoordinates)
+          // Show warning icon for invalid locations
+          if (!hasValidCoordinates || !isInJitra)
             Tooltip(
-              message: 'Using Jitra coordinates',
+              message: !hasValidCoordinates 
+                  ? 'Invalid coordinates' 
+                  : 'Outside Jitra area',
               child: Icon(
-                Icons.info_outline,
+                Icons.warning_amber_rounded,
                 color: Colors.orange,
                 size: 16,
               ),
@@ -215,20 +335,22 @@ class _LocationSearchState extends State<LocationSearch> {
           ),
         ],
       ),
-      onTap: () {
-        // Before returning the location, ensure it has valid coordinates
-        LocationModel locationToReturn = location;
-        
-        // If no valid coordinates, fix them with Jitra coordinates
-        if (!hasValidCoordinates) {
-          locationToReturn = location.copyWith(
-            latitude: AppGeoConstants.jitraLatitude,
-            longitude: AppGeoConstants.jitraLongitude
-          );
-        }
-        
-        widget.onLocationSelected(locationToReturn);
-      },
+      // Only allow selection for valid locations within Jitra
+      onTap: hasValidCoordinates && isInJitra 
+        ? () => widget.onLocationSelected(location)
+        : () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  !hasValidCoordinates
+                      ? 'This location has invalid coordinates'
+                      : 'This location is outside Jitra area',
+                  style: const TextStyle(color: Colors.white),
+                ),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          },
     );
   }
 }

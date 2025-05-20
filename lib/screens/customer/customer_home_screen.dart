@@ -57,11 +57,35 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Future<void> _handleLikeToggle(FeedbackModel feedback, bool isLiked) async {
-    final userId = Provider.of<AuthProvider>(context, listen: false).user!.id;
-    await Provider.of<LocationProvider>(context, listen: false).toggleLike(
-      feedbackId: feedback.id,
-      userId: userId,
-    );
+    try {
+      final userId = Provider.of<AuthProvider>(context, listen: false).user!.id;
+      await Provider.of<LocationProvider>(context, listen: false).toggleLike(
+        feedbackId: feedback.id,
+        userId: userId,
+      );
+      
+      // Show visual feedback
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isLiked ? 'Liked!' : 'Unliked'),
+            duration: const Duration(seconds: 1),
+            backgroundColor: isLiked ? Colors.pink : Colors.grey,
+          ),
+        );
+      }
+    } catch (e) {
+      print("Error toggling like: $e");
+      // Show error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   void _showCommentDialog(FeedbackModel feedback) {
@@ -88,16 +112,96 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           TextButton(
             onPressed: () async {
               if (commentController.text.trim().isNotEmpty) {
-                final userId = Provider.of<AuthProvider>(context, listen: false).user!;
-                await Provider.of<LocationProvider>(context, listen: false).addComment(
-                  feedbackId: feedback.id,
-                  user: userId,
-                  comment: commentController.text.trim(),
+                try {
+                  final userId = Provider.of<AuthProvider>(context, listen: false).user!;
+                  await Provider.of<LocationProvider>(context, listen: false).addComment(
+                    feedbackId: feedback.id,
+                    user: userId,
+                    comment: commentController.text.trim(),
+                  );
+                  Navigator.of(context).pop();
+                  
+                  // Show success message
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Comment added successfully'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  print("Error adding comment: $e");
+                  // Show error message
+                  Navigator.of(context).pop();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              } else {
+                // Show validation error
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please enter a comment'),
+                    backgroundColor: Colors.orange,
+                  ),
                 );
-                Navigator.of(context).pop();
               }
             },
             child: const Text('POST'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Add method to view all comments for a feedback item
+  void _viewAllComments(FeedbackModel feedback) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${feedback.comments.length} Comments'),
+        content: Container(
+          width: double.maxFinite,
+          height: 300,
+          child: ListView.builder(
+            itemCount: feedback.comments.length,
+            itemBuilder: (context, index) {
+              final comment = feedback.comments[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  radius: 12,
+                  backgroundColor: Colors.grey.shade200,
+                  child: Text(
+                    comment.username.isNotEmpty ? comment.username[0].toUpperCase() : '?',
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ),
+                title: Text(
+                  comment.username,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                subtitle: Text(comment.text),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CLOSE'),
           ),
         ],
       ),
@@ -191,7 +295,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ),
           ),
           
-          // Role-specific header - Updated for worker view-only mode
+          // Welcome message for all users
           Container(
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             padding: const EdgeInsets.all(12),
@@ -203,13 +307,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             child: Row(
               children: const [
                 Icon(
-                  Icons.visibility,
+                  Icons.info_outline,
                   color: Colors.teal,
                 ),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'User Mode : You can view and add feedback to help other women',
+                    'You can view, like, and comment on all safety information to help other women',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.black87,
@@ -263,7 +367,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                               color: Colors.grey,
                             ),
                           ),
-                          // Remove the "Add your feedback" button for workers
                         ],
                       ),
                     );
@@ -278,7 +381,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         feedback: feedback[index],
                         currentUserId: userId,
                         onTap: () {
-                          // View feedback details (can remain enabled for workers)
+                          // View feedback details (optional enhancement)
+                          if (feedback[index].comments.isNotEmpty) {
+                            _viewAllComments(feedback[index]);
+                          }
                         },
                         onLikeToggle: (isLiked) {
                           _handleLikeToggle(feedback[index], isLiked);
@@ -296,14 +402,5 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         ],
       ),
     );
-  }
-
-  // Helper methods for role-specific UI are kept but not used in the new implementation
-  Color _getRoleColor(bool isWorker) {
-    return isWorker ? Colors.teal : AppColors.secondary;
-  }
-
-  IconData _getRoleIcon(bool isWorker) {
-    return isWorker ? Icons.work : Icons.person;
   }
 }

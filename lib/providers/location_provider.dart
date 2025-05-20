@@ -245,7 +245,7 @@ class LocationProvider with ChangeNotifier {
     }
   }
 
-  Future<List<LocationModel>> searchLocationsWithFeedback(String query) async {
+   Future<List<LocationModel>> searchLocationsWithFeedback(String query) async {
     if (query.isEmpty) return [];
     
     _setLoading(true);
@@ -264,8 +264,25 @@ class LocationProvider with ChangeNotifier {
       final filteredResults = results.where((location) => 
           locationIdsWithFeedback.contains(location.id)).toList();
       
-      print("Filtered from ${results.length} to ${filteredResults.length} results with feedback");
-      return filteredResults;
+      // Further filter by valid coordinates and location in Jitra
+      final locationService = LocationService();
+      final validResults = filteredResults.where((location) {
+        // Check for valid coordinates
+        if (location.latitude == 0 || location.longitude == 0) {
+          return false;
+        }
+        
+        // Check if in Jitra area
+        final bool isInJitra = locationService.isInJitraArea(
+          location.latitude, 
+          location.longitude
+        );
+        
+        return isInJitra;
+      }).toList();
+      
+      print("Filtered from ${results.length} to ${filteredResults.length} results with feedback, ${validResults.length} in Jitra area");
+      return validResults;
     } catch (e) {
       print("Error searching locations with feedback: $e");
       _setError(e.toString());
@@ -319,15 +336,36 @@ class LocationProvider with ChangeNotifier {
   }
 
   // Get all locations that have feedback
-  List<LocationModel> getLocationsWithFeedback() {
+   List<LocationModel> getLocationsWithFeedback() {
     // Create a set of location IDs that have feedback
     final Set<String> locationIdsWithFeedback = _feedback
         .map((feedback) => feedback.locationId)
         .toSet();
     
     // Filter locations to only include those with feedback
-    return _locations.where((location) => 
+    final List<LocationModel> locationsWithFeedback = _locations.where((location) => 
         locationIdsWithFeedback.contains(location.id)).toList();
+    
+    // Filter out locations with invalid coordinates or outside Jitra
+    final locationService = LocationService();
+    final List<LocationModel> validLocations = locationsWithFeedback.where((location) {
+      // Check for valid coordinates
+      if (location.latitude == 0 || location.longitude == 0) {
+        return false;
+      }
+      
+      // Check if in Jitra area
+      final bool isInJitra = locationService.isInJitraArea(
+        location.latitude, 
+        location.longitude
+      );
+      
+      return isInJitra;
+    }).toList();
+    
+    print("Found ${validLocations.length} valid locations with feedback out of ${locationsWithFeedback.length} total");
+    
+    return validLocations;
   }
 
   // Add feedback with improved error handling
@@ -395,6 +433,28 @@ class LocationProvider with ChangeNotifier {
     }
   }
 
+ // Add a method to refresh the map specifically
+  Future<void> refreshMap() async {
+    print("Force refreshing map data");
+    
+    _setLoading(true);
+    try {
+      // Load fresh location data
+      loadLocations();
+      
+      // Add a small delay to allow data to load
+      await Future.delayed(Duration(milliseconds: 500));
+      
+      // Notify listeners to trigger UI updates
+      notifyListeners();
+    } catch (e) {
+      print("Error refreshing map: $e");
+      _setError(e.toString());
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
   // Approve feedback (for admin)
   Future<bool> approveFeedback(String feedbackId) async {
     _setLoading(true);
@@ -515,6 +575,8 @@ class LocationProvider with ChangeNotifier {
       return [];
     }
   }
+
+  
 
   // Force refresh all data
   Future<void> refreshAllData() async {

@@ -1,3 +1,5 @@
+// Modified constants.dart file to ensure proper Jitra boundaries
+
 import 'package:flutter/material.dart';
 
 class AppColors {
@@ -58,13 +60,23 @@ class AppGeoConstants {
   static const double jitraLatitude = 6.2641;
   static const double jitraLongitude = 100.4214;
   
-  // Maximum allowed distance from Jitra in kilometers (adjust as needed)
-  // 15km covers the general Jitra area
-  static const double maxDistanceFromJitraKm = 15.0;
+  // Maximum allowed distance from Jitra in kilometers
+  // Reduced from 15km to 10km for tighter area restriction
+  static const double maxDistanceFromJitraKm = 10.0;
   
   // Kedah state boundary coordinates (approximate)
   static const double kedahNorth = 6.5167; // Northern boundary
   static const double kedahSouth = 5.4586; // Southern boundary
   static const double kedahEast = 101.1532; // Eastern boundary
   static const double kedahWest = 99.6445; // Western boundary
+  
+  // Map zoom levels
+  static const double defaultZoom = 14.0;
+  static const double closeZoom = 16.0;
+  static const double farZoom = 12.0;
+  static const double maxZoom = 18.0;
+  static const double minZoom = 10.0;
+  
+  // Map movement thresholds
+  static const double bounceThresholdKm = 12.0; // When to bounce back to Jitra
 }

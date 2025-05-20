@@ -56,7 +56,7 @@ class DatabaseService {
     return getFeedback(status: AppConstants.feedbackStatusApproved);
   }
 
-   // Get feedback by user role
+  // Get feedback by user role
   Stream<List<FeedbackModel>> getFeedbackByUserRole(String userRole, {String? status}) {
     print("Starting feedback stream for role: $userRole" + (status != null ? " with status: $status" : ""));
     
@@ -91,6 +91,7 @@ class DatabaseService {
     String? imageBase64,
   }) async {
     try {
+      print("Starting addFeedback process for location: $locationName (ID: $locationId)");
       final String feedbackId = _uuid.v4();
       final DateTime now = DateTime.now();
 
@@ -117,6 +118,7 @@ class DatabaseService {
         userRole: user.role,
       );
 
+      print("Saving feedback with ID: $feedbackId, status: $initialStatus");
       // Save to Firestore
       await _firestore
           .collection(AppConstants.feedbackCollection)
@@ -125,7 +127,13 @@ class DatabaseService {
 
       // Update location safety rating (only if feedback is approved)
       if (initialStatus == AppConstants.feedbackStatusApproved) {
+        print("Feedback is approved, updating location safety rating");
         await _updateLocationSafetyRating(locationId, locationName, safetyRating);
+        
+        // Add a small delay to ensure Firestore updates propagate
+        await Future.delayed(const Duration(milliseconds: 500));
+      } else {
+        print("Feedback is pending approval, not updating location safety rating yet");
       }
 
       return feedbackModel;
@@ -141,6 +149,7 @@ class DatabaseService {
     required String status,
   }) async {
     try {
+      print("Updating feedback status: $feedbackId to $status");
       // Get the current feedback
       final DocumentSnapshot feedbackDoc = await _firestore
           .collection(AppConstants.feedbackCollection)
@@ -166,11 +175,15 @@ class DatabaseService {
       // If feedback is being approved, update location safety rating
       if (status == AppConstants.feedbackStatusApproved && 
           feedbackModel.status != AppConstants.feedbackStatusApproved) {
+        print("Feedback is now approved, updating location safety rating");
         await _updateLocationSafetyRating(
           feedbackModel.locationId, 
           feedbackModel.locationName, 
           feedbackModel.safetyRating
         );
+        
+        // Add a small delay to ensure Firestore updates propagate
+        await Future.delayed(const Duration(milliseconds: 500));
       }
 
       return updatedFeedback;
@@ -286,8 +299,8 @@ class DatabaseService {
           // Handle potential missing data
           if (!data.containsKey('latitude') || !data.containsKey('longitude')) {
             print("Location ${data['name'] ?? id} missing coordinates, adding defaults");
-            data['latitude'] = 6.2641; // Jitra center
-            data['longitude'] = 100.4214;
+            data['latitude'] = AppGeoConstants.jitraLatitude; // Jitra center
+            data['longitude'] = AppGeoConstants.jitraLongitude;
           }
           
           return LocationModel.fromMap(data, id);
@@ -295,7 +308,7 @@ class DatabaseService {
         
         // Log all locations to debug
         for (var location in locations) {
-          print("Loaded: ${location.name} (${location.latitude}, ${location.longitude})");
+          print("Loaded: ${location.name} (${location.latitude}, ${location.longitude}) - Safety level: ${location.safetyLevel}");
         }
         
         return locations;
@@ -305,18 +318,22 @@ class DatabaseService {
   // Get location by ID
   Future<LocationModel?> getLocationById(String locationId) async {
     try {
+      print("Fetching location with ID: $locationId");
       final DocumentSnapshot locationDoc = await _firestore
           .collection(AppConstants.locationsCollection)
           .doc(locationId)
           .get();
 
       if (!locationDoc.exists) {
+        print("Location not found with ID: $locationId");
         return null;
       }
 
-      return LocationModel.fromMap(
-          locationDoc.data() as Map<String, dynamic>, locationId);
+      final locationData = locationDoc.data() as Map<String, dynamic>;
+      print("Found location: ${locationData['name']} (${locationData['latitude']}, ${locationData['longitude']})");
+      return LocationModel.fromMap(locationData, locationId);
     } catch (e) {
+      print("Error getting location: $e");
       throw Exception('Error getting location: $e');
     }
   }
@@ -328,6 +345,7 @@ class DatabaseService {
     required double longitude,
   }) async {
     try {
+      print("Adding or updating location: $name at ($latitude, $longitude)");
       // Validate coordinates - if 0,0 or null, use Jitra coordinates
       if (latitude == 0 || longitude == 0) {
         print("Invalid coordinates (0,0) for location: $name. Using Jitra center coordinates.");
@@ -346,8 +364,8 @@ class DatabaseService {
         longitude = AppGeoConstants.jitraLongitude;
       }
       
-      // Proceed with the existing code...
       // Check if location exists
+      print("Checking if location '$name' already exists");
       final QuerySnapshot existingLocations = await _firestore
           .collection(AppConstants.locationsCollection)
           .where('name', isEqualTo: name)
@@ -357,6 +375,7 @@ class DatabaseService {
       if (existingLocations.docs.isNotEmpty) {
         // Location exists, update it
         final String locationId = existingLocations.docs[0].id;
+        print("Location exists with ID: $locationId, updating coordinates");
         final LocationModel existingLocation = LocationModel.fromMap(
             existingLocations.docs[0].data() as Map<String, dynamic>, locationId);
 
@@ -371,10 +390,12 @@ class DatabaseService {
             .doc(locationId)
             .update(updatedLocation.toMap());
 
+        print("Location updated: ${updatedLocation.name} (${updatedLocation.latitude}, ${updatedLocation.longitude}) - Safety level: ${updatedLocation.safetyLevel}");
         return updatedLocation;
       } else {
         // Create new location with verified coordinates
         final String locationId = _uuid.v4();
+        print("Creating new location with ID: $locationId");
         final LocationModel newLocation = LocationModel(
           id: locationId,
           name: name,
@@ -391,6 +412,7 @@ class DatabaseService {
             .doc(locationId)
             .set(newLocation.toMap());
 
+        print("New location created: ${newLocation.name} (${newLocation.latitude}, ${newLocation.longitude}) - Safety level: ${newLocation.safetyLevel}");
         return newLocation;
       }
     } catch (e) {
@@ -406,27 +428,35 @@ class DatabaseService {
     double newRating,
   ) async {
     try {
+      print("Updating safety rating for location: $locationName (ID: $locationId) - New rating: $newRating");
       // Get the current location
       LocationModel? location = await getLocationById(locationId);
 
       if (location == null) {
         // Location not found, create it
+        print("Location not found, creating new location");
         location = await addOrUpdateLocation(
           name: locationName,
-          latitude: 0.0, // Default values, will be updated later
-          longitude: 0.0,
+          latitude: AppGeoConstants.jitraLatitude, // Use Jitra coordinates instead of 0,0
+          longitude: AppGeoConstants.jitraLongitude,
         );
       }
 
       // Update safety rating
+      print("Current rating: ${location.averageSafetyRating} (${location.ratingCount} ratings)");
       final LocationModel updatedLocation = location.updateSafetyRating(newRating);
+      print("Updated rating: ${updatedLocation.averageSafetyRating} (${updatedLocation.ratingCount} ratings)");
+      print("New safety level: ${updatedLocation.safetyLevel}");
 
       // Update in Firestore
       await _firestore
           .collection(AppConstants.locationsCollection)
           .doc(locationId)
           .update(updatedLocation.toMap());
+          
+      print("Location safety rating updated successfully");
     } catch (e) {
+      print("Error updating location safety rating: $e");
       throw Exception('Error updating location safety rating: $e');
     }
   }

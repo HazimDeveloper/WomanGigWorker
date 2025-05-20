@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:trust_me/widgets/map_legend.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../widgets/location_search.dart';
 import '../../widgets/risk_map.dart';
@@ -17,66 +18,62 @@ class BuddyMapScreen extends StatefulWidget {
   State<BuddyMapScreen> createState() => _BuddyMapScreenState();
 }
 
-class _BuddyMapScreenState extends State<BuddyMapScreen> with AutomaticKeepAliveClientMixin {
+class _BuddyMapScreenState extends State<BuddyMapScreen> {
   final GlobalKey<RiskMapState> _mapKey = GlobalKey<RiskMapState>();
   List<LocationModel> _searchResults = [];
   bool _isSearching = false;
   bool _showSearch = false;
   bool _dataLoaded = false;
 
-  // AutomaticKeepAliveClientMixin override
   @override
-  bool get wantKeepAlive => true;
-
-@override
-void initState() {
-  super.initState();
-  // Load locations with a small delay to ensure everything is initialized
-  Future.delayed(Duration(milliseconds: 300), () {
-    if (mounted) {
-      _forceLoadLocations();
-    }
-  });
-}
-
-void _forceLoadLocations() {
-  final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-  
-  // First clear any existing data
-  locationProvider.clearData();
-  
-  // Then load fresh data
-  print("Force loading locations and current position");
-  locationProvider.loadLocations();
-  locationProvider.getCurrentLocation();
-  
-  // After a delay, check if we got data
-  Future.delayed(Duration(seconds: 2), () {
-    if (mounted) {
-      final locations = locationProvider.locations;
-      print("After force load: ${locations.length} locations available");
-      
-      if (locations.isEmpty) {
-        // If still empty, try adding a sample location
-        print("Still no locations, adding sample");
-        _addSampleLocation(locationProvider);
+  void initState() {
+    super.initState();
+    // Load locations with a small delay to ensure everything is initialized
+    Future.delayed(Duration(milliseconds: 300), () {
+      if (mounted) {
+        _forceLoadLocations();
       }
-    }
-  });
-}
-
-Future<void> _addSampleLocation(LocationProvider provider) async {
-  try {
-    await provider.addLocation(
-      name: "Jitra Center",
-      latitude: 6.2641,
-      longitude: 100.4214,
-    );
-    print("Added sample location");
-  } catch (e) {
-    print("Error adding sample location: $e");
+    });
   }
-}
+
+  void _forceLoadLocations() {
+    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+    
+    // First clear any existing data
+    locationProvider.clearData();
+    
+    // Then load fresh data
+    print("Force loading locations and current position");
+    locationProvider.loadLocations();
+    locationProvider.getCurrentLocation();
+    
+    // After a delay, check if we got data
+    Future.delayed(Duration(seconds: 2), () {
+      if (mounted) {
+        final locations = locationProvider.locations;
+        print("After force load: ${locations.length} locations available");
+        
+        if (locations.isEmpty) {
+          // If still empty, try adding a sample location
+          print("Still no locations, adding sample");
+          _addSampleLocation(locationProvider);
+        }
+      }
+    });
+  }
+
+  Future<void> _addSampleLocation(LocationProvider provider) async {
+    try {
+      await provider.addLocation(
+        name: "Jitra Center",
+        latitude: 6.2641,
+        longitude: 100.4214,
+      );
+      print("Added sample location");
+    } catch (e) {
+      print("Error adding sample location: $e");
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -87,56 +84,56 @@ Future<void> _addSampleLocation(LocationProvider provider) async {
     }
   }
 
-void _loadLocations() {
-  try {
-    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-    locationProvider.loadLocations();
-    locationProvider.getCurrentLocation();
-    print("Location provider: loadLocations and getCurrentLocation called");
-  } catch (e) {
-    print("Error loading locations: $e");
-  }
-}
-
- Future<void> _searchLocations(String query) async {
-  if (query.isEmpty) {
-    setState(() {
-      _searchResults = [];
-    });
-    return;
-  }
-
-  setState(() {
-    _isSearching = true;
-  });
-
-  try {
-    final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-    
-    // Use the new method that directly returns locations with feedback
-    final results = await locationProvider.searchLocationsWithFeedback(query);
-    
-    setState(() {
-      _searchResults = results;
-      _isSearching = false;
-    });
-    
-    // Show message if no results
-    if (results.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No locations with feedback found matching your search'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+  void _loadLocations() {
+    try {
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      locationProvider.loadLocations();
+      locationProvider.getCurrentLocation();
+      print("Location provider: loadLocations and getCurrentLocation called");
+    } catch (e) {
+      print("Error loading locations: $e");
     }
-  } catch (e) {
-    print("Search error: $e");
-    setState(() {
-      _isSearching = false;
-    });
   }
-}
+
+  Future<void> _searchLocations(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+      
+      // Use the method that directly returns locations with feedback
+      final results = await locationProvider.searchLocationsWithFeedback(query);
+      
+      setState(() {
+        _searchResults = results;
+        _isSearching = false;
+      });
+      
+      // Show message if no results
+      if (results.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No locations with feedback found matching your search'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print("Search error: $e");
+      setState(() {
+        _isSearching = false;
+      });
+    }
+  }
 
   void _handleLocationSelected(LocationModel location) {
     final position = LatLng(location.latitude, location.longitude);
@@ -232,27 +229,64 @@ void _loadLocations() {
                 ],
               ),
               const SizedBox(height: 16),
-              // Information instead of action button
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: AppColors.secondary,
-                    ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'As a Buddy user, you can view location safety information but cannot add feedback.',
-                        style: TextStyle(fontSize: 13),
+              // Action button to add feedback or view more details
+              ElevatedButton.icon(
+                onPressed: () {
+                  // Close bottom sheet
+                  Navigator.pop(context);
+                  
+                  // Get feedback for this location and show in a separate screen or dialog
+                  final locationProvider = Provider.of<LocationProvider>(context, listen: false);
+                  final feedbackList = locationProvider.getFeedbackForLocation(location.id);
+                  
+                  if (feedbackList.isNotEmpty) {
+                    // Show feedback list (implement a dialog or navigate to a detail screen)
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Safety Information for ${location.name}'),
+                        content: Container(
+                          width: double.maxFinite,
+                          height: MediaQuery.of(context).size.height * 0.5,
+                          child: ListView.builder(
+                            itemCount: feedbackList.length,
+                            itemBuilder: (context, index) {
+                              final feedback = feedbackList[index];
+                              return ListTile(
+                                title: Text(feedback.username),
+                                subtitle: Text(feedback.feedback),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.star, color: Colors.amber, size: 16),
+                                    Text(feedback.safetyRating.toString()),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('CLOSE'),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('No detailed feedback available for this location'),
+                      ),
+                    );
+                  }
+                },
+                icon: Icon(Icons.info_outline),
+                label: Text('VIEW SAFETY DETAILS'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondary,
+                  foregroundColor: Colors.white,
                 ),
               ),
             ],
@@ -264,28 +298,40 @@ void _loadLocations() {
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
-    
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Trust.ME Map'),
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _forceLoadLocations,
+            tooltip: 'Refresh Map',
+          ),
+        ],
+      ),
+      backgroundColor: AppColors.primary,
       body: Consumer<LocationProvider>(
         builder: (context, locationProvider, _) {
           final currentPosition = locationProvider.currentPosition;
           final locations = locationProvider.locations;
           final isLoading = locationProvider.isLoading;
 
-       // Debug print to check locations
-        print("Map screen received ${locations.length} locations");
-        
-        // Check for valid locations
-        if (locations.isEmpty && !isLoading) {
-          // If no locations and not loading, force a reload
-          print("No locations available, triggering reload");
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              locationProvider.loadLocations();
-            }
-          });
-        }
+          // Debug print to check locations
+          print("Map screen received ${locations.length} locations");
+          
+          // Check for valid locations
+          if (locations.isEmpty && !isLoading) {
+            // If no locations and not loading, force a reload
+            print("No locations available, triggering reload");
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                locationProvider.loadLocations();
+              }
+            });
+          }
 
           return Stack(
             children: [
@@ -367,42 +413,6 @@ void _loadLocations() {
                 bottom: 16,
                 right: 16,
                 child: MapLegend(),
-              ),
-
-              // Buddy Status Indicator
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 80,
-                left: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondary.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.secondary),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.verified_user,
-                        color: AppColors.secondary,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'Buddy Mode: View-only access',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
 
               // Search Panel (fullscreen when active)
