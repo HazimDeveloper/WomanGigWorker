@@ -10,7 +10,7 @@ class RiskMap extends StatefulWidget {
   final LatLng? initialPosition;
   final double initialZoom;
   final Function(LocationModel location)? onLocationSelected;
-  final Function(LatLng position)? onMapTapped; // Add this new callback
+  final Function(LatLng position)? onMapTapped; // This will be null for workers
 
   const RiskMap({
     Key? key,
@@ -18,7 +18,7 @@ class RiskMap extends StatefulWidget {
     this.initialPosition,
     this.initialZoom = 14.0,
     this.onLocationSelected,
-    this.onMapTapped, // Add this parameter
+    this.onMapTapped, // Will be null for view-only mode
   }) : super(key: key);
 
   @override
@@ -47,6 +47,8 @@ class RiskMapState extends State<RiskMap> {
       _updateMarkersAndCircles();
     }
   }
+
+  
 
   void _updateMarkersAndCircles() {
     final Set<Marker> markers = {};

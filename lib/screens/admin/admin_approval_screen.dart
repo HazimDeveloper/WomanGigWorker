@@ -159,7 +159,7 @@ class _AdminApprovalScreenState extends State<AdminApprovalScreen> {
         backgroundColor: AppColors.primary,
         elevation: 0,
         title: const Text(
-          'BUDDY FEEDBACK APPROVAL',
+          'BUDDY SAFETY INFORMATION APPROVAL',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,

@@ -1,3 +1,4 @@
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import '../../models/feedback_model.dart';
 import '../../config/constants.dart';
 import 'buddy_map_screen.dart';
 import 'buddy_profile_screen.dart';
+import '../../screens/customer/customer_upload_screen.dart'; // Import the upload screen
 
 class BuddyHomeScreen extends StatefulWidget {
   static const String routeName = '/buddy/home';
@@ -132,6 +134,9 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
           // Map Page
           const KeepAlivePage(child: BuddyMapScreen()),
           
+          // Add Upload Page for buddies
+          const KeepAlivePage(child: CustomerUploadScreen()),
+          
           // Profile Page
           const KeepAlivePage(child: BuddyProfileScreen()),
         ],
@@ -155,11 +160,23 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
             label: 'Map',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.add_circle_outline),
+            label: 'Upload',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profile',
           ),
         ],
       ),
+      // Add a floating action button for quick upload access
+      floatingActionButton: _currentIndex == 0 ? FloatingActionButton(
+        backgroundColor: AppColors.secondary,
+        onPressed: () {
+          _pageController.jumpToPage(2); // Jump to upload page
+        },
+        child: const Icon(Icons.add, color: Colors.white),
+      ) : null,
     );
   }
 
@@ -221,7 +238,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    'You are a Buddy user. Your feedback will need admin approval before showing to others.',
+                    'You are a Buddy user. Your safety information will need admin approval before showing to others.',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.black87,
@@ -279,16 +296,33 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: () => setState(() {
-                      _showApprovedFeedback = false;
-                    }),
-                    icon: const Icon(Icons.hourglass_top),
-                    label: const Text('View my pending feedback'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.secondary,
-                      foregroundColor: Colors.white,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => setState(() {
+                          _showApprovedFeedback = false;
+                        }),
+                        icon: const Icon(Icons.hourglass_top),
+                        label: const Text('View my pending'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _pageController.jumpToPage(2); // Jump to upload page
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add feedback'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -372,29 +406,63 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  ElevatedButton.icon(
-                    onPressed: () => setState(() {
-                      _showApprovedFeedback = true;
-                    }),
-                    icon: const Icon(Icons.visibility),
-                    label: const Text('View approved feedback'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton.icon(
+                        onPressed: () => setState(() {
+                          _showApprovedFeedback = true;
+                        }),
+                        icon: const Icon(Icons.visibility),
+                        label: const Text('View approved'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _pageController.jumpToPage(2); // Jump to upload page
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add new'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.secondary,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             );
           }
           
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: myPendingFeedback.length,
-            itemBuilder: (context, index) {
-              final feedback = myPendingFeedback[index];
-              return _buildPendingFeedbackCard(feedback);
-            },
+          return Stack(
+            children: [
+              ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: myPendingFeedback.length,
+                itemBuilder: (context, index) {
+                  final feedback = myPendingFeedback[index];
+                  return _buildPendingFeedbackCard(feedback);
+                },
+              ),
+              // Add floating action button to add more feedback even when there's pending feedback
+              Positioned(
+                bottom: 16,
+                right: 16,
+                child: FloatingActionButton(
+                  heroTag: "addMoreFeedback",
+                  backgroundColor: AppColors.secondary,
+                  onPressed: () {
+                    _pageController.jumpToPage(2); // Jump to upload page
+                  },
+                  child: const Icon(Icons.add, color: Colors.white),
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -516,7 +584,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Admin will review this feedback soon. Approved feedback will be visible to everyone.',
+              'Admin will review this safety information soon. Approved safety information will be visible to everyone.',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey[600],

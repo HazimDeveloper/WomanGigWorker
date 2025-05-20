@@ -480,7 +480,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
         backgroundColor: AppColors.primary,
         elevation: 0,
         title: const Text(
-          'Add Feedback',
+          ' ADD SAFETY INFORMATION',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -494,7 +494,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
           labelColor: Colors.black,
           tabs: const [
             Tab(
-              text: 'FEEDBACK',
+              text: 'SAFETY INFORMATION',
               icon: Icon(Icons.feedback),
             ),
             Tab(
@@ -644,7 +644,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
                 
                 // Feedback Text
                 CustomTextField(
-                  labelText: 'WRITE YOUR FEEDBACK',
+                  labelText: 'WRITE YOUR CAPTION',
                   hintText: 'Share your experience at this location...',
                   controller: _feedbackController,
                   keyboardType: TextInputType.multiline,

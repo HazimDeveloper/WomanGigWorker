@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:trust_me/providers/auth_provider.dart';
 import 'package:trust_me/services/location_service.dart';
 import 'package:trust_me/widgets/map_legend.dart';
 import '../../providers/location_provider.dart';
@@ -207,6 +208,8 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isWorker = Provider.of<AuthProvider>(context).user?.role == AppConstants.roleWorker;
+
     return Scaffold(
       body: Consumer<LocationProvider>(
         builder: (context, locationProvider, _) {
@@ -281,7 +284,7 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                 child: MapLegend(),
               ),
               
-              // Add Location Button
+              if (!isWorker)
               Positioned(
                 bottom: 80,
                 right: 16,
@@ -305,6 +308,42 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                   child: Icon(
                     _isInSelectionMode ? Icons.close : Icons.add_location_alt,
                     color: Colors.white,
+                  ),
+                ),
+              ),
+              // Add Location Button
+                if (isWorker)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 80,
+                left: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.teal.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.teal),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.visibility,
+                        color: Colors.teal,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Worker Mode: View-only access',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

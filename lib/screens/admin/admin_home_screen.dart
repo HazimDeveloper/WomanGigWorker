@@ -63,7 +63,7 @@ class AdminHomeScreen extends StatelessWidget {
             // Admin Menu Options
             _buildAdminMenuButton(
               context,
-              'Feedback Approval',
+              'Safety Information Approval',
               Icons.approval,
               () {
                 Navigator.pushNamed(context, AdminApprovalScreen.routeName);

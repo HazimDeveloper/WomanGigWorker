@@ -21,7 +21,10 @@ class AuthProvider with ChangeNotifier {
   bool get isCustomer => _user?.role == AppConstants.roleCustomer;
   bool get isBuddy => _user?.role == AppConstants.roleBuddy;
   bool get isAdmin => _user?.role == AppConstants.roleAdmin;
-
+  bool get canAddFeedback {
+    // Workers cannot add feedback, everyone else can
+    return _user != null && _user!.role != AppConstants.roleWorker;
+  }
   // Constructor - initialize user from current Firebase user
   AuthProvider() {
     _initializeUser();

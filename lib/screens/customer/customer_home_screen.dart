@@ -1,3 +1,5 @@
+// lib/screens/customer/customer_home_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
@@ -7,7 +9,6 @@ import '../../config/constants.dart';
 import '../../models/feedback_model.dart';
 import 'customer_map_screen.dart';
 import 'customer_profile_screen.dart';
-import 'customer_upload_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   static const String routeName = '/customer/home';
@@ -122,6 +123,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       body: PageView(
         controller: _pageController,
         onPageChanged: _onPageChanged,
+        // Remove the swipe gesture if needed
+        physics: const ClampingScrollPhysics(),
         children: [
           // Home Feed Page
           _buildHomeFeed(isWorker),
@@ -129,10 +132,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           // Map Page
           const CustomerMapScreen(),
           
-          // Upload Feedback Page
-          const CustomerUploadScreen(),
-          
-          // Profile Page
+          // Profile Page - remove the upload page
           const CustomerProfileScreen(),
         ],
       ),
@@ -141,7 +141,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
-        selectedItemColor: isWorker ? Colors.teal : AppColors.secondary,
+        selectedItemColor: Colors.teal, // Worker color
         unselectedItemColor: Colors.grey,
         showSelectedLabels: false,
         showUnselectedLabels: false,
@@ -154,10 +154,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             icon: Icon(Icons.map),
             label: 'Map',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline),
-            label: 'Upload',
-          ),
+          // No upload tab for workers
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Profile',
@@ -194,26 +191,26 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ),
           ),
           
-          // Role-specific header
+          // Role-specific header - Updated for worker view-only mode
           Container(
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _getRoleColor(isWorker).withOpacity(0.2),
+              color: Colors.teal.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _getRoleColor(isWorker)),
+              border: Border.all(color: Colors.teal),
             ),
             child: Row(
-              children: [
+              children: const [
                 Icon(
-                  _getRoleIcon(isWorker),
-                  color: _getRoleColor(isWorker),
+                  Icons.visibility,
+                  color: Colors.teal,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    _getRoleMessage(isWorker),
-                    style: const TextStyle(
+                    'User Mode : You can view and add feedback to help other women',
+                    style: TextStyle(
                       fontSize: 14,
                       color: Colors.black87,
                     ),
@@ -244,40 +241,29 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
+                        children: const [
+                          Icon(
                             Icons.feedback_outlined,
                             size: 64,
                             color: Colors.grey,
                           ),
-                          const SizedBox(height: 16),
-                          const Text(
+                          SizedBox(height: 16),
+                          Text(
                             'No feedback available yet',
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.black54,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          const Text(
+                          SizedBox(height: 8),
+                          Text(
                             'Pull down to refresh',
                             style: TextStyle(
                               fontSize: 14,
                               color: Colors.grey,
                             ),
                           ),
-                          const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              _pageController.jumpToPage(2); // Go to upload screen
-                            },
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add your feedback'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isWorker ? Colors.teal : AppColors.secondary,
-                              foregroundColor: Colors.white,
-                            ),
-                          ),
+                          // Remove the "Add your feedback" button for workers
                         ],
                       ),
                     );
@@ -292,7 +278,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         feedback: feedback[index],
                         currentUserId: userId,
                         onTap: () {
-                          // TODO: Implement feedback details screen
+                          // View feedback details (can remain enabled for workers)
                         },
                         onLikeToggle: (isLiked) {
                           _handleLikeToggle(feedback[index], isLiked);
@@ -312,20 +298,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  // Helper methods for role-specific UI
+  // Helper methods for role-specific UI are kept but not used in the new implementation
   Color _getRoleColor(bool isWorker) {
     return isWorker ? Colors.teal : AppColors.secondary;
   }
 
   IconData _getRoleIcon(bool isWorker) {
     return isWorker ? Icons.work : Icons.person;
-  }
-
-  String _getRoleMessage(bool isWorker) {
-    if (isWorker) {
-      return 'Worker Mode: Your feedback will automatically be approved to help other women in your community.';
-    } else {
-      return 'Customer Mode: You can view and add safety information to help other women.';
-    }
   }
 }
