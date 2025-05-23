@@ -116,14 +116,13 @@ class RiskMapState extends State<RiskMap> {
       
       validLocations++;
 
-      // Create marker
+      // Create marker WITHOUT infoWindow to remove text bubbles
       final marker = Marker(
         markerId: MarkerId(location.id),
         position: LatLng(location.latitude, location.longitude),
-        infoWindow: InfoWindow(
-          title: location.name,
-          snippet: 'Safety: ${location.safetyLevel}',
-        ),
+        // Remove infoWindow or set it to empty to remove text
+        // infoWindow: InfoWindow(), // Can use empty InfoWindow if needed
+        icon: BitmapDescriptor.defaultMarker, // You can customize the marker icon here
         onTap: () {
           widget.onLocationSelected?.call(location);
         },
@@ -191,10 +190,11 @@ class RiskMapState extends State<RiskMap> {
           markerId: const MarkerId('selected_position'),
           position: position,
           icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
-          infoWindow: const InfoWindow(
-            title: 'Selected Location',
-            snippet: 'Tap to confirm this location',
-          ),
+          // Remove infoWindow to remove text
+          // infoWindow: const InfoWindow(
+          //   title: 'Selected Location',
+          //   snippet: 'Tap to confirm this location',
+          // ),
         );
         
         setState(() {

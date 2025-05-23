@@ -133,19 +133,41 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
           TextButton(
             onPressed: () async {
               if (commentController.text.trim().isNotEmpty) {
-                final user = Provider.of<AuthProvider>(context, listen: false).user!;
-                await Provider.of<LocationProvider>(context, listen: false).addComment(
-                  feedbackId: feedbackId,
-                  user: user,
-                  comment: commentController.text.trim(),
-                );
-                Navigator.of(context).pop();
-                
-                // Show success message
+                try {
+                  final user = Provider.of<AuthProvider>(context, listen: false).user!;
+                  await Provider.of<LocationProvider>(context, listen: false).addComment(
+                    feedbackId: feedbackId,
+                    user: user,
+                    comment: commentController.text.trim(),
+                  );
+                  Navigator.of(context).pop();
+                  
+                  // Show success message
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Comment added successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  print("Error adding comment: $e");
+                  // Show error message
+                  Navigator.of(context).pop();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              } else {
+                // Show validation error
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Comment added successfully'),
-                    backgroundColor: Colors.green,
+                    content: Text('Please enter a comment'),
+                    backgroundColor: Colors.orange,
                   ),
                 );
               }
@@ -232,29 +254,9 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Safety rating and label
+                  // Rating information (without safety level text)
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(color: statusColor),
-                        ),
-                        child: Text(
-                          location.safetyLevel.replaceAll('_', ' ').toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: statusColor,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
                       Icon(
                         Icons.star,
                         color: Colors.amber,
@@ -523,197 +525,18 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Consumer<LocationProvider>(
-        builder: (context, locationProvider, _) {
-          final currentPosition = locationProvider.currentPosition;
-          final locations = locationProvider.locations;
-          final isLoading = locationProvider.isLoading;
-
-          return Stack(
-            children: [
-              // Map
-              if (isLoading && currentPosition == null)
-                const Center(
-                  child: CircularProgressIndicator(),
-                )
-              else
-                RiskMap(
-                  key: _mapKey,
-                  locations: locations,
-                  initialPosition: currentPosition != null
-                      ? LatLng(currentPosition.latitude, currentPosition.longitude)
-                      : null,
-                  onLocationSelected: _handleLocationSelected,
-                  onMapTapped: _handleMapTapped, // Add this
-                ),
-
-              // Search Bar
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 16,
-                left: 16,
-                right: 16,
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _showSearch = true;
-                    });
-                  },
-                  child: Container(
-                    height: 50,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: const [
-                        Icon(Icons.search, color: Colors.grey),
-                        SizedBox(width: 8),
-                        Text(
-                          'Search location...',
-                          style: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-
-              // Map Legend
-              const Positioned(
-                bottom: 16,
-                right: 16,
-                child: MapLegend(),
-              ),
-              
-              // Add Location Button
-              Positioned(
-                bottom: 80,
-                right: 16,
-                child: FloatingActionButton(
-                  backgroundColor: _isInSelectionMode ? Colors.orange : AppColors.secondary,
-                  onPressed: () {
-                    setState(() {
-                      _isInSelectionMode = !_isInSelectionMode;
-                    });
-                    _mapKey.currentState?.setSelectionMode(_isInSelectionMode);
-                    
-                    if (_isInSelectionMode) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Tap anywhere on the map to add a new location in Jitra area'),
-                          duration: Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  },
-                  child: Icon(
-                    _isInSelectionMode ? Icons.close : Icons.add_location_alt,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-
-              // Search Panel (fullscreen when active)
-              if (_showSearch)
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.white,
-                    child: Column(
-                      children: [
-                        AppBar(
-                          backgroundColor: Colors.white,
-                          elevation: 0,
-                          leading: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.black),
-                            onPressed: () {
-                              setState(() {
-                                _showSearch = false;
-                                _searchResults = [];
-                              });
-                            },
-                          ),
-                          title: const Text(
-                            'Search Location',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: LocationSearch(
-                            onSearch: _searchLocations,
-                            onLocationSelected: (location) {
-                              setState(() {
-                                _showSearch = false;
-                              });
-                              _handleLocationSelected(location);
-                            },
-                            searchResults: _searchResults,
-                            isLoading: _isLoading,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-              // Loading indicator
-              if (_isLoading)
-                Container(
-                  color: Colors.black.withOpacity(0.3),
-                  child: const Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-  
-  // Add map tap handling
+  // Add map tap handling - DISABLE FOR CUSTOMERS
   void _handleMapTapped(LatLng position) {
-    if (_isInSelectionMode) {
-      setState(() {
-        _selectedPosition = position;
-      });
-      
-      // Check if position is in Jitra
-      final locationService = LocationService();
-      final bool isInJitra = locationService.isInJitraArea(
-        position.latitude, 
-        position.longitude
-      );
-      
-      if (isInJitra) {
-        // Show dialog to add new location
-        _showAddLocationDialog(position);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Selected location is outside Jitra area. Please select a location within the blue boundary.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    }
+    // For customers, we don't allow adding locations, so this is disabled
+    // If you implement role-specific UI, you could check the user role here
+    
+    // Uncomment this for debugging purposes only
+    // ScaffoldMessenger.of(context).showSnackBar(
+    //   const SnackBar(
+    //     content: Text('Adding new locations is not available for regular users'),
+    //     backgroundColor: Colors.orange,
+    //   ),
+    // );
   }
   
   // Show dialog to add new location
@@ -828,5 +651,170 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Consumer<LocationProvider>(
+        builder: (context, locationProvider, _) {
+          final currentPosition = locationProvider.currentPosition;
+          final locations = locationProvider.locations;
+          final isLoading = locationProvider.isLoading;
+
+          return Stack(
+            children: [
+              // Map
+              if (isLoading && currentPosition == null)
+                const Center(
+                  child: CircularProgressIndicator(),
+                )
+              else
+                RiskMap(
+                  key: _mapKey,
+                  locations: locations,
+                  initialPosition: currentPosition != null
+                      ? LatLng(currentPosition.latitude, currentPosition.longitude)
+                      : null,
+                  onLocationSelected: _handleLocationSelected,
+                  onMapTapped: _handleMapTapped, // Add this
+                ),
+
+              // Search Bar
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 16,
+                left: 16,
+                right: 16,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _showSearch = true;
+                    });
+                  },
+                  child: Container(
+                    height: 50,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.search, color: Colors.grey),
+                        SizedBox(width: 8),
+                        Text(
+                          'Search location...',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // Map Legend
+              const Positioned(
+                bottom: 16,
+                right: 16,
+                child: MapLegend(),
+              ),
+              
+              // Add Location Button - HIDE FOR CUSTOMERS
+              // Positioned(
+              //   bottom: 80,
+              //   right: 16,
+              //   child: FloatingActionButton(
+              //     backgroundColor: _isInSelectionMode ? Colors.orange : AppColors.secondary,
+              //     onPressed: () {
+              //       setState(() {
+              //         _isInSelectionMode = !_isInSelectionMode;
+              //       });
+              //       _mapKey.currentState?.setSelectionMode(_isInSelectionMode);
+              //       
+              //       if (_isInSelectionMode) {
+              //         ScaffoldMessenger.of(context).showSnackBar(
+              //           const SnackBar(
+              //             content: Text('Tap anywhere on the map to add a new location in Jitra area'),
+              //             duration: Duration(seconds: 3),
+              //           ),
+              //         );
+              //       }
+              //     },
+              //     child: Icon(
+              //       _isInSelectionMode ? Icons.close : Icons.add_location_alt,
+              //       color: Colors.white,
+              //     ),
+              //   ),
+              // ),
+
+              // Search Panel (fullscreen when active)
+              if (_showSearch)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.white,
+                    child: Column(
+                      children: [
+                        AppBar(
+                          backgroundColor: Colors.white,
+                          elevation: 0,
+                          leading: IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.black),
+                            onPressed: () {
+                              setState(() {
+                                _showSearch = false;
+                                _searchResults = [];
+                              });
+                            },
+                          ),
+                          title: const Text(
+                            'Search Location',
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: LocationSearch(
+                            onSearch: _searchLocations,
+                            onLocationSelected: (location) {
+                              setState(() {
+                                _showSearch = false;
+                              });
+                              _handleLocationSelected(location);
+                            },
+                            searchResults: _searchResults,
+                            isLoading: _isLoading,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+              // Loading indicator
+              if (_isLoading)
+                Container(
+                  color: Colors.black.withOpacity(0.3),
+                  child: const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }

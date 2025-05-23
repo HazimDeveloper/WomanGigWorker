@@ -194,26 +194,6 @@ class _BuddyMapScreenState extends State<BuddyMapScreen> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: statusColor),
-                    ),
-                    child: Text(
-                      location.safetyLevel.replaceAll('_', ' ').toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                   Icon(
                     Icons.star,
                     color: Colors.amber,
