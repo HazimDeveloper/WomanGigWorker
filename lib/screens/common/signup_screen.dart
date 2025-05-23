@@ -355,8 +355,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         children: [
                           // Role selection tiles with improved visual appearance
                           _buildRoleSelectionTile(
-                            title: 'User',
-                            subtitle: 'I want to use the app for safety information',
+                            title: 'Gig worker',
+                            subtitle: 'I want to use the app to check and monitor the safety level of locations before accepting jobs.',
                             icon: Icons.person,
                             value: AppConstants.roleCustomer,
                             color: AppColors.secondary,
@@ -364,7 +364,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           const Divider(height: 1),
                           _buildRoleSelectionTile(
                             title: 'Buddy',
-                            subtitle: 'I want to help by reporting safety issues',
+                            subtitle: 'I want to help keep the community gig workers safe by reporting real-time safety information',
                             icon: Icons.support_agent,
                             value: AppConstants.roleBuddy,
                             color: Colors.purple,
