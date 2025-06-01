@@ -127,7 +127,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
         _isLoading = false;
       });
       
-      print("Filtered to ${filteredResults.length} locations in Jitra with feedback");
+      print("Filtered to ${filteredResults.length} locations in Jitra with Safety Information");
       
     } catch (e) {
       print("Error searching locations: $e");
@@ -418,17 +418,17 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
         
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Feedback uploaded successfully! Check the map to see updated safety information.'),
+            content: Text('Safety Information uploaded successfully! Check the map to see updated safety information.'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 4),
           ),
         );
       }
     } catch (e) {
-      print("Error uploading feedback: $e");
+      print("Error uploading Safety Information: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error uploading feedback. Please try again.'),
+          content: Text('Error uploading Safety Information. Please try again.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -623,7 +623,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
                   minLines: 3,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please enter your feedback';
+                      return 'Please enter your Safety Information';
                     }
                     return null;
                   },
@@ -725,7 +725,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
                     onLocationSelected: _selectLocation,
                     searchResults: _searchResults,
                     isLoading: _isLoading,
-                    emptyMessage: 'No locations found with feedback',
+                    emptyMessage: 'No locations found with Safety Information',
                   );
                 },
               ),
@@ -826,7 +826,7 @@ class _CustomerUploadScreenState extends State<CustomerUploadScreen> with Single
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'You can only add feedback for locations within Jitra area (blue circle)',
+                        'You can only add Safety Information for locations within Jitra area (blue circle)',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,

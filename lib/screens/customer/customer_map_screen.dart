@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:provider/provider.dart';
@@ -78,7 +80,7 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
       if (results.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No locations with feedback found matching your search'),
+            content: Text('No locations with Safety Information found matching your search'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -180,6 +182,11 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
   }
 
   void _showLocationDetailsBottomSheet(LocationModel location) {
+    // Get user for role-based colors
+    final user = Provider.of<AuthProvider>(context, listen: false).user!;
+    final backgroundColor = AppColors.getBackgroundForRole(user.role);
+    final secondaryColor = AppColors.getSecondaryForRole(user.role);
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true, // Allow for larger sheet
@@ -254,7 +261,7 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Rating information (without safety level text)
+                  // Rating information
                   Row(
                     children: [
                       Icon(
@@ -274,13 +281,34 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                   const SizedBox(height: 24),
                   
                   // Feedback list header
-                  const Text(
-                    'SAFETY INFORMATION',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+                  Row(
+                    children: [
+                      const Text(
+                        'SAFETY INFORMATION',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: statusColor),
+                        ),
+                        child: Text(
+                          location.safetyLevel.replaceAll('_', ' ').toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   const Divider(),
@@ -310,6 +338,9 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                       
                       return Card(
                         margin: const EdgeInsets.only(bottom: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Column(
@@ -334,12 +365,37 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
-                                          feedback.username,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              feedback.username,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: feedback.userRole == AppConstants.roleBuddy 
+                                                    ? Colors.purple.withOpacity(0.2)
+                                                    : secondaryColor.withOpacity(0.2),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                feedback.userRole == AppConstants.roleBuddy ? 'Buddy' : 'User',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: feedback.userRole == AppConstants.roleBuddy 
+                                                      ? Colors.purple
+                                                      : secondaryColor,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
+                                        const SizedBox(height: 4),
                                         Row(
                                           children: [
                                             ...List.generate(
@@ -354,17 +410,55 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                                                 size: 14,
                                               ),
                                             ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              feedback.safetyRating.toStringAsFixed(1),
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ],
                                     ),
                                   ),
+                                  // Date
+                                  Text(
+                                    _formatDate(feedback.createdAt),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 12),
                               
                               // Feedback text
-                              Text(feedback.feedback),
+                              Text(
+                                feedback.feedback,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                              
+                              // Show image if available
+                              if (feedback.imageBase64 != null && feedback.imageBase64!.isNotEmpty) ...[
+                                const SizedBox(height: 12),
+                                Container(
+                                  width: double.infinity,
+                                  height: 120,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(8),
+                                    image: DecorationImage(
+                                      image: MemoryImage(
+                                        base64Decode(feedback.imageBase64!)
+                                      ),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              
                               const SizedBox(height: 12),
                               
                               // Like and comment actions
@@ -373,41 +467,64 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                                   // Like button
                                   InkWell(
                                     onTap: () => _handleLikeToggle(feedback.id, !isLiked),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          isLiked ? Icons.favorite : Icons.favorite_border,
-                                          color: isLiked ? Colors.red : Colors.grey,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${feedback.likedBy.length}',
-                                          style: TextStyle(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: isLiked ? Colors.red.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            isLiked ? Icons.favorite : Icons.favorite_border,
                                             color: isLiked ? Colors.red : Colors.grey,
+                                            size: 18,
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${feedback.likedBy.length}',
+                                            style: TextStyle(
+                                              color: isLiked ? Colors.red : Colors.grey,
+                                              fontSize: 14,
+                                              fontWeight: isLiked ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
+                                  const SizedBox(width: 12),
                                   
                                   // Comment button
                                   InkWell(
                                     onTap: () => _showCommentDialog(feedback.id),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.comment_outlined,
-                                          color: Colors.grey,
-                                          size: 18,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${feedback.comments.length}',
-                                          style: const TextStyle(color: Colors.grey),
-                                        ),
-                                      ],
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.comment_outlined,
+                                            color: Colors.grey,
+                                            size: 18,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${feedback.comments.length}',
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -415,11 +532,11 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                               
                               // Show comments if any
                               if (feedback.comments.isNotEmpty) ...[
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 12),
                                 const Divider(),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 8),
                                 ...feedback.comments.take(2).map((comment) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
+                                  padding: const EdgeInsets.only(bottom: 8),
                                   child: Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -508,7 +625,10 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                                         ),
                                       );
                                     },
-                                    child: const Text('View all comments'),
+                                    child: Text(
+                                      'View all ${feedback.comments.length} comments',
+                                      style: TextStyle(color: secondaryColor, fontSize: 12),
+                                    ),
                                   ),
                               ],
                             ],
@@ -525,137 +645,37 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
     );
   }
 
+  // Format date for display
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${date.day}/${date.month}';
+    }
+  }
+
   // Add map tap handling - DISABLE FOR CUSTOMERS
   void _handleMapTapped(LatLng position) {
     // For customers, we don't allow adding locations, so this is disabled
-    // If you implement role-specific UI, you could check the user role here
-    
-    // Uncomment this for debugging purposes only
-    // ScaffoldMessenger.of(context).showSnackBar(
-    //   const SnackBar(
-    //     content: Text('Adding new locations is not available for regular users'),
-    //     backgroundColor: Colors.orange,
-    //   ),
-    // );
-  }
-  
-  // Show dialog to add new location
-  void _showAddLocationDialog(LatLng position) {
-    _locationNameController.text = ""; // Clear previous input
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Location'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Enter a name for this location:'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _locationNameController,
-              decoration: const InputDecoration(
-                hintText: 'Location name',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Coordinates: ${position.latitude.toStringAsFixed(6)}, ${position.longitude.toStringAsFixed(6)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Exit selection mode
-              _mapKey.currentState?.setSelectionMode(false);
-              setState(() {
-                _isInSelectionMode = false;
-              });
-            },
-            child: const Text('CANCEL'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = _locationNameController.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a location name'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-              
-              // Close dialog
-              Navigator.of(context).pop();
-              
-              // Add the new location
-              await _addNewLocation(name, position);
-              
-              // Exit selection mode
-              _mapKey.currentState?.setSelectionMode(false);
-              setState(() {
-                _isInSelectionMode = false;
-              });
-            },
-            child: const Text('ADD'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  // Add new location
-  Future<void> _addNewLocation(String name, LatLng position) async {
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      final locationProvider = Provider.of<LocationProvider>(context, listen: false);
-      
-      // Create a new location
-      final newLocation = await locationProvider.addLocation(
-        name: name,
-        latitude: position.latitude,
-        longitude: position.longitude,
-      );
-      
-      if (newLocation != null) {
-        // Show success message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Location "$name" added successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // Show the location details
-        _handleLocationSelected(newLocation);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error adding location: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    // This maintains view-only functionality for customer/worker users
   }
 
   @override
   Widget build(BuildContext context) {
+    // Get user for role-based colors
+    final user = Provider.of<AuthProvider>(context, listen: false).user;
+    final backgroundColor = user != null ? AppColors.getBackgroundForRole(user.role) : AppColors.background;
+    final secondaryColor = user != null ? AppColors.getSecondaryForRole(user.role) : AppColors.secondary;
+    
     return Scaffold(
+      backgroundColor: backgroundColor, // Use role-based background
       body: Consumer<LocationProvider>(
         builder: (context, locationProvider, _) {
           final currentPosition = locationProvider.currentPosition;
@@ -677,7 +697,7 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                       ? LatLng(currentPosition.latitude, currentPosition.longitude)
                       : null,
                   onLocationSelected: _handleLocationSelected,
-                  onMapTapped: _handleMapTapped, // Add this
+                  onMapTapped: _handleMapTapped, // View-only for customers
                 ),
 
               // Search Bar
@@ -706,10 +726,10 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                       ],
                     ),
                     child: Row(
-                      children: const [
-                        Icon(Icons.search, color: Colors.grey),
-                        SizedBox(width: 8),
-                        Text(
+                      children: [
+                        Icon(Icons.search, color: secondaryColor),
+                        const SizedBox(width: 8),
+                        const Text(
                           'Search location...',
                           style: TextStyle(
                             color: Colors.grey,
@@ -729,33 +749,45 @@ class _CustomerMapScreenState extends State<CustomerMapScreen> {
                 child: MapLegend(),
               ),
               
-              // Add Location Button - HIDE FOR CUSTOMERS
-              // Positioned(
-              //   bottom: 80,
-              //   right: 16,
-              //   child: FloatingActionButton(
-              //     backgroundColor: _isInSelectionMode ? Colors.orange : AppColors.secondary,
-              //     onPressed: () {
-              //       setState(() {
-              //         _isInSelectionMode = !_isInSelectionMode;
-              //       });
-              //       _mapKey.currentState?.setSelectionMode(_isInSelectionMode);
-              //       
-              //       if (_isInSelectionMode) {
-              //         ScaffoldMessenger.of(context).showSnackBar(
-              //           const SnackBar(
-              //             content: Text('Tap anywhere on the map to add a new location in Jitra area'),
-              //             duration: Duration(seconds: 3),
-              //           ),
-              //         );
-              //       }
-              //     },
-              //     child: Icon(
-              //       _isInSelectionMode ? Icons.close : Icons.add_location_alt,
-              //       color: Colors.white,
-              //     ),
-              //   ),
-              // ),
+              // User type indicator (top right)
+              if (user != null)
+                Positioned(
+                  top: MediaQuery.of(context).padding.top + 80,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: secondaryColor.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          user.role == AppConstants.roleWorker ? Icons.work : Icons.person,
+                          color: Colors.white,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          user.role == AppConstants.roleWorker ? 'Gig Worker' : 'Gig Worker',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
               // Search Panel (fullscreen when active)
               if (_showSearch)

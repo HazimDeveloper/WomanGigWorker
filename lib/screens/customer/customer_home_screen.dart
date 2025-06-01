@@ -219,11 +219,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     
-    // Determine if user is a worker for styling
-    final bool isWorker = user.role == AppConstants.roleWorker;
+    // Get role-based colors
+    final backgroundColor = AppColors.getBackgroundForRole(user.role);
+    final secondaryColor = AppColors.getSecondaryForRole(user.role);
 
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: backgroundColor, // Use role-based background
       body: PageView(
         controller: _pageController,
         onPageChanged: _onPageChanged,
@@ -231,7 +232,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         physics: const ClampingScrollPhysics(),
         children: [
           // Home Feed Page
-          _buildHomeFeed(isWorker),
+          _buildHomeFeed(user.role, backgroundColor, secondaryColor),
           
           // Map Page
           const CustomerMapScreen(),
@@ -245,7 +246,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
-        selectedItemColor: Colors.teal, // Worker color
+        selectedItemColor: secondaryColor, // Use role-based secondary color
         unselectedItemColor: Colors.grey,
         showSelectedLabels: false,
         showUnselectedLabels: false,
@@ -268,11 +269,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  Widget _buildHomeFeed(bool isWorker) {
+  Widget _buildHomeFeed(String userRole, Color backgroundColor, Color secondaryColor) {
+    // Determine user type label
+    String userTypeLabel = userRole == AppConstants.roleWorker ? 'Gig Worker' : 'Gig Worker';
+    
     return SafeArea(
       child: Column(
         children: [
-          Padding(
+          Container(
+            color: backgroundColor,
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Row(
               children: [
@@ -285,6 +290,35 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                 ),
                 const Spacer(),
+                // Show user type badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: secondaryColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: secondaryColor),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        userRole == AppConstants.roleWorker ? Icons.work : Icons.person,
+                        color: secondaryColor,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        userTypeLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: secondaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.notifications_none),
                   onPressed: () {
@@ -300,18 +334,18 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.teal.withOpacity(0.2),
+              color: secondaryColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.teal),
+              border: Border.all(color: secondaryColor),
             ),
             child: Row(
-              children: const [
+              children: [
                 Icon(
                   Icons.info_outline,
-                  color: Colors.teal,
+                  color: secondaryColor,
                 ),
-                SizedBox(width: 8),
-                Expanded(
+                const SizedBox(width: 8),
+                const Expanded(
                   child: Text(
                     'You can view, like, and comment on all safety information to help other women',
                     style: TextStyle(
@@ -326,76 +360,79 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           
           // Feedback List with optimized rebuild strategy
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                 Provider.of<LocationProvider>(context, listen: false).loadFeedback();
-              },
-              child: Consumer<LocationProvider>(
-                builder: (context, locationProvider, _) {
-                  final feedback = locationProvider.feedback;
-                  final isLoading = locationProvider.isLoading;
-                  
-                  if (isLoading && feedback.isEmpty) {
-                    return const Center(
-                      child: CircularProgressIndicator(),
-                    );
-                  }
-                  
-                  if (feedback.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(
-                            Icons.feedback_outlined,
-                            size: 64,
-                            color: Colors.grey,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'No feedback available yet',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.black54,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Pull down to refresh',
-                            style: TextStyle(
-                              fontSize: 14,
+            child: Container(
+              color: backgroundColor,
+              child: RefreshIndicator(
+                onRefresh: () async {
+                   Provider.of<LocationProvider>(context, listen: false).loadFeedback();
+                },
+                child: Consumer<LocationProvider>(
+                  builder: (context, locationProvider, _) {
+                    final feedback = locationProvider.feedback;
+                    final isLoading = locationProvider.isLoading;
+                    
+                    if (isLoading && feedback.isEmpty) {
+                      return const Center(
+                        child: CircularProgressIndicator(),
+                      );
+                    }
+                    
+                    if (feedback.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(
+                              Icons.feedback_outlined,
+                              size: 64,
                               color: Colors.grey,
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  
-                  return ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: feedback.length,
-                    itemBuilder: (context, index) {
-                      final userId = Provider.of<AuthProvider>(context).user!.id;
-                      return FeedbackCard(
-                        feedback: feedback[index],
-                        currentUserId: userId,
-                        onTap: () {
-                          // View feedback details (optional enhancement)
-                          if (feedback[index].comments.isNotEmpty) {
-                            _viewAllComments(feedback[index]);
-                          }
-                        },
-                        onLikeToggle: (isLiked) {
-                          _handleLikeToggle(feedback[index], isLiked);
-                        },
-                        onAddComment: () {
-                          _showCommentDialog(feedback[index]);
-                        },
+                            SizedBox(height: 16),
+                            Text(
+                              'No Safety Information available yet',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.black54,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Pull down to refresh',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
                       );
-                    },
-                  );
-                },
+                    }
+                    
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: feedback.length,
+                      itemBuilder: (context, index) {
+                        final userId = Provider.of<AuthProvider>(context).user!.id;
+                        return FeedbackCard(
+                          feedback: feedback[index],
+                          currentUserId: userId,
+                          onTap: () {
+                            // View feedback details (optional enhancement)
+                            if (feedback[index].comments.isNotEmpty) {
+                              _viewAllComments(feedback[index]);
+                            }
+                          },
+                          onLikeToggle: (isLiked) {
+                            _handleLikeToggle(feedback[index], isLiked);
+                          },
+                          onAddComment: () {
+                            _showCommentDialog(feedback[index]);
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
           ),

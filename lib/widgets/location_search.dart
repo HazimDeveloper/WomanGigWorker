@@ -61,9 +61,9 @@ class _LocationSearchState extends State<LocationSearch> {
         _loadingLocations = false;
       });
       
-      print("Loaded ${_feedbackLocations.length} locations with feedback for search");
+      print("Loaded ${_feedbackLocations.length} locations with Safety Information for search");
     } catch (e) {
-      print("Error loading feedback locations: $e");
+      print("Error loading Safety Information locations: $e");
       setState(() {
         _loadingLocations = false;
       });
@@ -142,7 +142,7 @@ class _LocationSearchState extends State<LocationSearch> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'You can only add feedback to locations within Jitra area. Search from ${_feedbackLocations.length} locations with existing feedback, or add a new location on the map.',
+                  'You can only add Safety Information to locations within Jitra area. Search from ${_feedbackLocations.length} locations with existing Safety Information, or add a new location on the map.',
                   style: const TextStyle(
                     fontSize: 12,
                     color: Colors.black87,
@@ -165,7 +165,7 @@ class _LocationSearchState extends State<LocationSearch> {
                   const Padding(
                     padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
                     child: Text(
-                      'LOCATIONS WITH FEEDBACK',
+                      'LOCATIONS WITH SAFETY INFORMATION',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,

@@ -216,14 +216,18 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     
+    // Get role-based colors for Buddy
+    final backgroundColor = AppColors.getBackgroundForRole(user.role); // Soft purple
+    final secondaryColor = AppColors.getSecondaryForRole(user.role); // Purple secondary
+    
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: backgroundColor, // Use soft purple background
       body: PageView(
         controller: _pageController,
         onPageChanged: _onPageChanged,
         children: [
           // Home Feed Page - wrapped in KeepAlivePage to prevent rebuilds
-          _buildBuddyHomeFeed(),
+          _buildBuddyHomeFeed(backgroundColor, secondaryColor),
           
           // Upload Page
           const KeepAlivePage(child: CustomerUploadScreen()),
@@ -237,7 +241,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
         backgroundColor: Colors.white,
-        selectedItemColor: AppColors.secondary,
+        selectedItemColor: secondaryColor, // Use purple secondary color
         unselectedItemColor: Colors.grey,
         showSelectedLabels: false,
         showUnselectedLabels: false,
@@ -258,7 +262,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
       ),
       // Add a floating action button for quick upload access
       floatingActionButton: _currentIndex == 0 ? FloatingActionButton(
-        backgroundColor: AppColors.secondary,
+        backgroundColor: secondaryColor, // Use purple secondary color
         onPressed: () {
           _pageController.jumpToPage(1); // Jump to upload page
         },
@@ -268,11 +272,12 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
   }
 
   // Build buddy home feed
-  Widget _buildBuddyHomeFeed() {
+  Widget _buildBuddyHomeFeed(Color backgroundColor, Color secondaryColor) {
     return SafeArea(
       child: Column(
         children: [
-          Padding(
+          Container(
+            color: backgroundColor,
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Row(
               children: [
@@ -285,6 +290,35 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                   ),
                 ),
                 const Spacer(),
+                // Buddy badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: secondaryColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: secondaryColor),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.verified_user,
+                        color: secondaryColor,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Buddy',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: secondaryColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
                 // Toggle button
                 TextButton.icon(
                   onPressed: () {
@@ -312,15 +346,15 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
             margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.secondary.withOpacity(0.2),
+              color: secondaryColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.secondary),
+              border: Border.all(color: secondaryColor),
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.verified_user,
-                  color: AppColors.secondary,
+                  color: secondaryColor,
                 ),
                 const SizedBox(width: 8),
                 const Expanded(
@@ -338,9 +372,12 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
           
           // Feedback List
           Expanded(
-            child: _showApprovedFeedback
-                ? _buildApprovedFeedbackList()
-                : _buildMyPendingFeedbackList(),
+            child: Container(
+              color: backgroundColor,
+              child: _showApprovedFeedback
+                  ? _buildApprovedFeedbackList(backgroundColor, secondaryColor)
+                  : _buildMyPendingFeedbackList(backgroundColor, secondaryColor),
+            ),
           ),
         ],
       ),
@@ -348,7 +385,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
   }
 
   // Show approved feedback from everyone
-  Widget _buildApprovedFeedbackList() {
+  Widget _buildApprovedFeedbackList(Color backgroundColor, Color secondaryColor) {
     return RefreshIndicator(
       onRefresh: () async {
          Provider.of<LocationProvider>(context, listen: false).loadFeedback();
@@ -376,7 +413,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'No approved feedback available yet',
+                    'No approved Safety Information available yet',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.black54,
@@ -403,9 +440,9 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                           _pageController.jumpToPage(1); // Jump to upload page
                         },
                         icon: const Icon(Icons.add),
-                        label: const Text('Add feedback'),
+                        label: const Text('Add Safety Information'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary,
+                          backgroundColor: secondaryColor,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -446,7 +483,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
   }
 
   // Show only this buddy's pending feedback
-  Widget _buildMyPendingFeedbackList() {
+  Widget _buildMyPendingFeedbackList(Color backgroundColor, Color secondaryColor) {
     final userId = Provider.of<AuthProvider>(context).user!.id;
     
     return RefreshIndicator(
@@ -481,7 +518,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'You have no pending feedback',
+                    'You have no pending Safety Information',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.black54,
@@ -489,7 +526,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'All your feedback has been processed',
+                    'All your Safety Information has been processed',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey,
@@ -518,7 +555,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                         icon: const Icon(Icons.add),
                         label: const Text('Add new'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.secondary,
+                          backgroundColor: secondaryColor,
                           foregroundColor: Colors.white,
                         ),
                       ),
@@ -536,7 +573,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                 itemCount: myPendingFeedback.length,
                 itemBuilder: (context, index) {
                   final feedback = myPendingFeedback[index];
-                  return _buildPendingFeedbackCard(feedback);
+                  return _buildPendingFeedbackCard(feedback, secondaryColor);
                 },
               ),
               // Add floating action button to add more feedback even when there's pending feedback
@@ -545,7 +582,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
                 right: 16,
                 child: FloatingActionButton(
                   heroTag: "addMoreFeedback",
-                  backgroundColor: AppColors.secondary,
+                  backgroundColor: secondaryColor,
                   onPressed: () {
                     _pageController.jumpToPage(1); // Jump to upload page
                   },
@@ -560,7 +597,7 @@ class _BuddyHomeScreenState extends State<BuddyHomeScreen> {
   }
 
   // Custom card for pending feedback
-  Widget _buildPendingFeedbackCard(FeedbackModel feedback) {
+  Widget _buildPendingFeedbackCard(FeedbackModel feedback, Color secondaryColor) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(

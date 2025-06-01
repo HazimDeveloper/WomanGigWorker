@@ -122,7 +122,7 @@ class _BuddyMapScreenState extends State<BuddyMapScreen> {
       if (results.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('No locations with feedback found matching your search'),
+            content: Text('No locations with Safety Information found matching your search'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -257,7 +257,7 @@ class _BuddyMapScreenState extends State<BuddyMapScreen> {
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('No detailed feedback available for this location'),
+                        content: Text('No detailed Safety Information available for this location'),
                       ),
                     );
                   }

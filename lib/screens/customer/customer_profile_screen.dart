@@ -181,10 +181,17 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
       );
     }
 
+    // Get role-based colors
+    final backgroundColor = AppColors.getBackgroundForRole(user.role);
+    final secondaryColor = AppColors.getSecondaryForRole(user.role);
+    
+    // Determine user type label
+    String userTypeLabel = user.role == AppConstants.roleWorker ? 'Gig Worker' : 'Gig Worker';
+
     return Scaffold(
-      backgroundColor: AppColors.primary,
+      backgroundColor: backgroundColor, // Use role-based background
       appBar: AppBar(
-        backgroundColor: AppColors.primary,
+        backgroundColor: backgroundColor,
         elevation: 0,
         title: const Text(
           'PROFILE',
@@ -219,192 +226,134 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
-            
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Profile Image
-              GestureDetector(
-                onTap: _isEditing ? _pickImage : null,
-                child: Stack(
-                  alignment: Alignment.bottomRight,
+              // Profile Card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 60,
-                      backgroundColor: Colors.grey.shade200,
-                      backgroundImage: _imageFile != null
-                          ? FileImage(_imageFile!) as ImageProvider
-                          : (user.photoBase64 != null 
-                              ? MemoryImage(base64Decode(user.photoBase64!)) as ImageProvider
-                              : (user.photoUrl != null
-                                  ? CachedNetworkImageProvider(user.photoUrl!) as ImageProvider
-                                  : null)),
-                      child: (_imageFile == null && user.photoBase64 == null && user.photoUrl == null)
-                          ? Text(
-                              user.username.isNotEmpty
-                                  ? user.username[0].toUpperCase()
-                                  : '?',
-                              style: const TextStyle(
-                                fontSize: 40,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black54,
+                    // Profile Image
+                    GestureDetector(
+                      onTap: _isEditing ? _pickImage : null,
+                      child: Stack(
+                        alignment: Alignment.bottomRight,
+                        children: [
+                          Container(
+                            height: 120,
+                            width: 120,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: secondaryColor.withOpacity(0.5),
+                                width: 3,
                               ),
-                            )
-                          : null,
+                            ),
+                            child: _buildProfileImage(user),
+                          ),
+                          if (_isEditing)
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: secondaryColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
-                    if (_isEditing)
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondary,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                    const SizedBox(height: 16),
+                    
+                    // Username
+                    Text(
+                      user.username,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
                       ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Username
-              Text(
-                user.username,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              
-              // Email
-              Text(
-                user.email,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.black54,
-                ),
-                 overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 32),
-              
-              // Profile Form
-              if (_isEditing) ...[
-                // Job Dropdown
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'JOB',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
-                    CustomDropdown(
-                      hintText: 'Select your job',
-                      value: _selectedJob,
-                      items: JobCategories.categories,
-                      isSearchable: true,
-                      onChanged: (String? value) {
-                        setState(() {
-                          _selectedJob = value;
-                          _customJobSelected = value == JobCategories.otherOption;
-                        });
-                      },
-                    ),
-                    if (_customJobSelected) ...[
-                      const SizedBox(height: 8),
-                      CustomTextField(
-                        labelText: 'SPECIFY YOUR JOB',
-                        controller: _customJobController,
-                        textInputAction: TextInputAction.next,
-                        validator: (value) {
-                          if (_customJobSelected && (value == null || value.isEmpty)) {
-                            return 'Please specify your job';
-                          }
-                          return null;
-                        },
+                    
+                    // Email
+                    Text(
+                      user.email,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.black54,
                       ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 16),
-                
-                // Company Input Field
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'COMPANY',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black87,
-                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
-                    CustomTextField(
-                      controller: _companyController,
-                      textInputAction: TextInputAction.next,
-                      hintText: 'Enter your company name',
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your company name';
-                        }
-                        return null;
-                      },
+                    const SizedBox(height: 16),
+                    
+                    // User Type Badge
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: secondaryColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: secondaryColor),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            user.role == AppConstants.roleWorker ? Icons.work : Icons.person,
+                            color: secondaryColor,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            userTypeLabel,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: secondaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                
-                // Phone Field
-                CustomTextField(
-                  labelText: 'PHONE NUMBER',
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.done,
-                ),
-                const SizedBox(height: 32),
-                
-                // Update Button
-                CustomButton(
-                  text: 'SAVE',
-                  onPressed: _updateProfile,
-                  isLoading: _isLoading,
-                  width: 200,
-                ),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Profile Information Section
+              if (!_isEditing) ...[
+                _buildInfoSection(user),
               ] else ...[
-                // Display job info
-                if (user.job != null && user.job!.isNotEmpty) ...[
-                  _buildInfoItem('Job', user.job!),
-                  const SizedBox(height: 16),
-                ],
-                
-                // Display company info
-                if (user.company != null && user.company!.isNotEmpty) ...[
-                  _buildInfoItem('Company', user.company!),
-                  const SizedBox(height: 16),
-                ],
-                
-                // Display phone info
-                if (user.phoneNumber != null && user.phoneNumber!.isNotEmpty) ...[
-                  _buildInfoItem('Phone', user.phoneNumber!),
-                  const SizedBox(height: 32),
-                ],
+                _buildEditForm(secondaryColor),
               ],
+              
+              const SizedBox(height: 32),
               
               // Sign Out Button
               if (!_isEditing)
@@ -422,19 +371,115 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
     );
   }
 
+  Widget _buildProfileImage(dynamic user) {
+    if (_imageFile != null) {
+      return CircleAvatar(
+        radius: 56,
+        backgroundColor: Colors.grey.shade200,
+        backgroundImage: FileImage(_imageFile!),
+      );
+    } else if (user.photoBase64 != null && user.photoBase64!.isNotEmpty) {
+      try {
+        return CircleAvatar(
+          radius: 56,
+          backgroundColor: Colors.grey.shade200,
+          backgroundImage: MemoryImage(base64Decode(user.photoBase64!)),
+        );
+      } catch (e) {
+        print("Error decoding base64 image: $e");
+      }
+    } else if (user.photoUrl != null && user.photoUrl!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 56,
+        backgroundColor: Colors.grey.shade200,
+        backgroundImage: CachedNetworkImageProvider(
+          user.photoUrl!,
+          cacheKey: "profile_${user.id}",
+        ),
+      );
+    }
+    
+    // Fallback to initials
+    return CircleAvatar(
+      radius: 56,
+      backgroundColor: Colors.grey.shade200,
+      child: Text(
+        user.username.isNotEmpty ? user.username[0].toUpperCase() : '?',
+        style: const TextStyle(
+          fontSize: 40,
+          fontWeight: FontWeight.bold,
+          color: Colors.black54,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(dynamic user) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'PERSONAL INFORMATION',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
+          
+          // Display job info
+          if (user.job != null && user.job!.isNotEmpty) ...[
+            _buildInfoItem('Job', user.job!),
+            const SizedBox(height: 16),
+          ],
+          
+          // Display company info
+          if (user.company != null && user.company!.isNotEmpty) ...[
+            _buildInfoItem('Company', user.company!),
+            const SizedBox(height: 16),
+          ],
+          
+          // Display phone info
+          if (user.phoneNumber != null && user.phoneNumber!.isNotEmpty)
+            _buildInfoItem('Phone', user.phoneNumber!),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInfoItem(String label, String value) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center, // Keep this
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '$label: ',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.black54,
+        SizedBox(
+          width: 80,
+          child: Text(
+            '$label:',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black54,
+            ),
           ),
         ),
-        // Add Expanded widget to handle text overflow
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             value,
@@ -442,12 +487,135 @@ class _CustomerProfileScreenState extends State<CustomerProfileScreen> {
               fontSize: 16,
               color: Colors.black,
             ),
-            // Add overflow handling
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
+            overflow: TextOverflow.visible,
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildEditForm(Color secondaryColor) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'EDIT PROFILE',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const SizedBox(height: 16),
+          
+          // Job Dropdown
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'JOB',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              CustomDropdown(
+                hintText: 'Select your job',
+                value: _selectedJob,
+                items: JobCategories.categories,
+                isSearchable: true,
+                onChanged: (String? value) {
+                  setState(() {
+                    _selectedJob = value;
+                    _customJobSelected = value == JobCategories.otherOption;
+                  });
+                },
+              ),
+              if (_customJobSelected) ...[
+                const SizedBox(height: 8),
+                CustomTextField(
+                  labelText: 'SPECIFY YOUR JOB',
+                  controller: _customJobController,
+                  textInputAction: TextInputAction.next,
+                  validator: (value) {
+                    if (_customJobSelected && (value == null || value.isEmpty)) {
+                      return 'Please specify your job';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 20),
+          
+          // Company Input Field
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'COMPANY',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 8),
+              CustomTextField(
+                controller: _companyController,
+                textInputAction: TextInputAction.next,
+                hintText: 'Enter your company name',
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your company name';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          
+          // Phone Field
+          CustomTextField(
+            labelText: 'PHONE NUMBER',
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.done,
+          ),
+          const SizedBox(height: 24),
+          
+          // Update Button
+          Center(
+            child: CustomButton(
+              text: 'SAVE CHANGES',
+              onPressed: _updateProfile,
+              isLoading: _isLoading,
+              width: 200,
+              backgroundColor: secondaryColor,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

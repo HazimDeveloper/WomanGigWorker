@@ -243,10 +243,14 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> with AutomaticK
           );
         }
 
+        // Get role-based colors for Buddy
+        final backgroundColor = AppColors.getBackgroundForRole(user.role); // Soft purple
+        final secondaryColor = AppColors.getSecondaryForRole(user.role); // Purple secondary
+
         return Scaffold(
-          backgroundColor: AppColors.primary,
+          backgroundColor: backgroundColor, // Use soft purple background
           appBar: AppBar(
-            backgroundColor: AppColors.primary,
+            backgroundColor: backgroundColor,
             elevation: 0,
             title: const Text(
               'MY PROFILE',
@@ -318,7 +322,7 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> with AutomaticK
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: AppColors.secondary.withOpacity(0.5),
+                                      color: secondaryColor.withOpacity(0.5),
                                       width: 3,
                                     ),
                                   ),
@@ -328,7 +332,7 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> with AutomaticK
                                   Container(
                                     padding: const EdgeInsets.all(8),
                                     decoration: BoxDecoration(
-                                      color: AppColors.secondary,
+                                      color: secondaryColor,
                                       shape: BoxShape.circle,
                                       border: Border.all(
                                         color: Colors.white,
@@ -371,16 +375,16 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> with AutomaticK
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
-                              color: AppColors.secondary.withOpacity(0.2),
+                              color: secondaryColor.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: AppColors.secondary),
+                              border: Border.all(color: secondaryColor),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   Icons.verified_user,
-                                  color: AppColors.secondary,
+                                  color: secondaryColor,
                                   size: 18,
                                 ),
                                 const SizedBox(width: 8),
@@ -389,7 +393,7 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> with AutomaticK
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.secondary,
+                                    color: secondaryColor,
                                   ),
                                 ),
                               ],
@@ -403,9 +407,9 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> with AutomaticK
                     
                     // Profile Information Section
                     if (!_isEditing) ...[
-                      _buildInfoSection(user),
+                      _buildInfoSection(user, secondaryColor),
                     ] else ...[
-                      _buildEditForm(),
+                      _buildEditForm(secondaryColor),
                     ],
                     
                     const SizedBox(height: 32),
@@ -477,7 +481,7 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> with AutomaticK
     );
   }
 
-  Widget _buildInfoSection(UserModel user) {
+  Widget _buildInfoSection(UserModel user, Color secondaryColor) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -509,36 +513,36 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> with AutomaticK
           
           // Display job info
           if (user.job != null && user.job!.isNotEmpty) ...[
-            _buildInfoItem(Icons.work, 'Job', user.job!),
+            _buildInfoItem(Icons.work, 'Job', user.job!, secondaryColor),
             const SizedBox(height: 16),
           ],
           
           // Display company info
           if (user.company != null && user.company!.isNotEmpty) ...[
-            _buildInfoItem(Icons.business, 'Company', user.company!),
+            _buildInfoItem(Icons.business, 'Company', user.company!, secondaryColor),
             const SizedBox(height: 16),
           ],
           
           // Display phone info
           if (user.phoneNumber != null && user.phoneNumber!.isNotEmpty)
-            _buildInfoItem(Icons.phone, 'Phone', user.phoneNumber!),
+            _buildInfoItem(Icons.phone, 'Phone', user.phoneNumber!, secondaryColor),
         ],
       ),
     );
   }
 
-  Widget _buildInfoItem(IconData icon, String label, String value) {
+  Widget _buildInfoItem(IconData icon, String label, String value, Color secondaryColor) {
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppColors.secondary.withOpacity(0.1),
+            color: secondaryColor.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
             icon,
-            color: AppColors.secondary,
+            color: secondaryColor,
             size: 20,
           ),
         ),
@@ -569,7 +573,7 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> with AutomaticK
     );
   }
 
-  Widget _buildEditForm() {
+  Widget _buildEditForm(Color secondaryColor) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -701,6 +705,7 @@ class _BuddyProfileScreenState extends State<BuddyProfileScreen> with AutomaticK
               onPressed: _updateProfile,
               isLoading: _isLoading,
               width: 200,
+              backgroundColor: secondaryColor,
             ),
           ),
         ],

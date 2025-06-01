@@ -1,4 +1,4 @@
-// Modified constants.dart file to ensure proper Jitra boundaries
+// Modified constants.dart file with role-based background colors
 
 import 'package:flutter/material.dart';
 
@@ -6,13 +6,48 @@ class AppColors {
   // Using the pink color from the design
   static const primary = Color(0xFFFFC0CB); // Pink color
   static const secondary = Color(0xFFB347B3); // Purple color for buttons
-  static const background = Color(0xFFFFC0CB); // Pink background
+  static const background = Color(0xFFFFC0CB); // Pink background (default)
   static const safeGreen = Color(0xFF4CAF50); // Green for safe areas
   static const moderateYellow = Color(0xFFFFEB3B); // Yellow for moderate risk
   static const highRiskRed = Color(0xFFE53935); // Red for high-risk areas
   static const textDark = Color(0xFF212121);
   static const textLight = Color(0xFF757575);
   static const cardBg = Color(0xFFAF35AF); // Darker pink for cards
+  
+  // New role-based background colors
+  static const gigWorkerBackground = Color(0xFFE3F2FD); // Soft blue for Gig Workers
+  static const buddyBackground = Color(0xFFF3E5F5); // Soft purple for Buddy users
+  static const adminBackground = Color(0xFFFFC0CB); // Keep pink for admin
+  
+  // Helper method to get background color based on user role
+  static Color getBackgroundForRole(String role) {
+    switch (role) {
+      case AppConstants.roleCustomer:
+      case AppConstants.roleWorker:
+        return gigWorkerBackground;
+      case AppConstants.roleBuddy:
+        return buddyBackground;
+      case AppConstants.roleAdmin:
+        return adminBackground;
+      default:
+        return background; // fallback to default pink
+    }
+  }
+  
+  // Helper method to get secondary color based on user role
+  static Color getSecondaryForRole(String role) {
+    switch (role) {
+      case AppConstants.roleCustomer:
+      case AppConstants.roleWorker:
+        return const Color(0xFF1976D2); // Blue secondary for gig workers
+      case AppConstants.roleBuddy:
+        return const Color(0xFF7B1FA2); // Purple secondary for buddy
+      case AppConstants.roleAdmin:
+        return secondary; // Keep original purple for admin
+      default:
+        return secondary;
+    }
+  }
 }
 
 class AppConstants {
